@@ -140,7 +140,7 @@ install_stage=(
     papirus-icon-theme ttf-jetbrains-mono ttf-jetbrains-mono-nerd
     ttf-droid ttf-fira-code noto-fonts-emoji adobe-source-code-pro-fonts
     otf-font-awesome lxappearance xfce4-settings nwg-look sddm hyprpolkitagent
-    xdg-utils  # [MINIMAL FIX #3] ต้องมีสำหรับ xdg-settings ตอนเลือก browser
+    xdg-utils
 )
 
 clear
@@ -283,31 +283,51 @@ if [[ $CFG =~ ^[Yy]$ ]]; then
     done
 
     echo -e "${NOTE} Linking config files..."
+
+    # --- Hyprland core config ---
     cp -r ~/.config/HyprV/hypr/* ~/.config/hypr/ 2>/dev/null || true
+
+    # --- Rofi launcher config ---
     cp -r ~/.config/HyprV/rofi/* ~/.config/rofi/ 2>/dev/null || true
+
+    # --- Wallpapers / Pictures ---
     cp -r ~/.config/HyprV/Pictures ~/ 2>/dev/null || true
 
+    # --- Kitty terminal config + themes ---
     ln -sf ~/.config/HyprV/kitty/kitty.conf ~/.config/kitty/kitty.conf 2>/dev/null || true
     cp -r ~/.config/HyprV/kitty/kitty-themes/ ~/.config/kitty/kitty-themes 2>/dev/null || true
 
+    # --- SwayNC notification center (config, style, icons, images) ---
     ln -sf ~/.config/HyprV/swaync/config.json ~/.config/swaync/config.json 2>/dev/null || true
     ln -sf ~/.config/HyprV/swaync/style.css ~/.config/swaync/style.css 2>/dev/null || true
     ln -sf ~/.config/HyprV/swaync/icons ~/.config/swaync 2>/dev/null || true
     ln -sf ~/.config/HyprV/swaync/images ~/.config/swaync 2>/dev/null || true
 
+    # --- Waybar config (ใช้ layout [TOP] Simple เป็น default) ---
     ln -sf ~/.config/HyprV/waybar/configs/[TOP]\ Simple ~/.config/waybar/config 2>/dev/null || true
+
+    # --- Waybar style (ใช้ theme [Colored] Translucent เป็น default) ---
     ln -sf ~/.config/HyprV/waybar/style/[Colored]\ Translucent.css ~/.config/waybar/style.css 2>/dev/null || true
+
+    # --- Wlogout layout, icons และ style ---
     ln -sf ~/.config/HyprV/wlogout/layout ~/.config/wlogout/layout 2>/dev/null || true
     ln -sf ~/.config/HyprV/wlogout/icons ~/.config/wlogout/icons 2>/dev/null || true
     ln -sf ~/.config/HyprV/wlogout/style.css ~/.config/wlogout/style.css 2>/dev/null || true
 
-    ln -sf ~/.config/HyprV/waybar/Modules ~/.config/waybar/Modules 2>/dev/null || true
-    ln -sf ~/.config/HyprV/waybar/ModulesCustom ~/.config/waybar/ModulesCustom 2>/dev/null || true
-    ln -sf ~/.config/HyprV/waybar/ModulesGroups ~/.config/waybar/ModulesGroups 2>/dev/null || true
-    ln -sf ~/.config/HyprV/waybar/ModulesWorkspaces ~/.config/waybar/ModulesWorkspaces 2>/dev/null || true
-    ln -sf ~/.config/HyprV/waybar/ModulesVertical ~/.config/waybar/ModulesVertical 2>/dev/null || true
+    # --- Waybar modules (แยกเป็นกลุ่มๆ ให้ง่ายต่อการแก้ไข) ---
+    ln -sf ~/.config/HyprV/waybar/Modules ~/.config/waybar/Modules 2>/dev/null || true           # modules มาตรฐาน
+    ln -sf ~/.config/HyprV/waybar/ModulesCustom ~/.config/waybar/ModulesCustom 2>/dev/null || true  # modules ที่ custom เพิ่ม
+    ln -sf ~/.config/HyprV/waybar/ModulesGroups ~/.config/waybar/ModulesGroups 2>/dev/null || true  # modules จัดกลุ่ม
+    ln -sf ~/.config/HyprV/waybar/ModulesWorkspaces ~/.config/waybar/ModulesWorkspaces 2>/dev/null || true  # workspace indicators
+    ln -sf ~/.config/HyprV/waybar/ModulesVertical ~/.config/waybar/ModulesVertical 2>/dev/null || true  # layout แนวตั้ง
+
+    # --- Waybar wallust color integration (sync สีกับ wallpaper) ---
     ln -sf ~/.config/HyprV/waybar/wallust ~/.config/waybar/wallust 2>/dev/null || true
+
+    # --- Wallust config (theme generator จาก wallpaper) ---
     ln -sf ~/.config/HyprV/wallust ~/.config/wallust 2>/dev/null || true
+
+    # --- Waybar style folder (เก็บ theme css ทั้งหมด) ---
     ln -sf ~/.config/HyprV/waybar/style ~/.config/waybar/style 2>/dev/null || true
 
     if [[ "$ISNVIDIA" == true ]]; then
