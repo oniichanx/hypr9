@@ -273,9 +273,12 @@ SERVICE="hyprpolkitagent"
 echo -e "${NOTE} Setting up $SERVICE..." | tee -a "$LOG"
 
 if systemctl --user list-unit-files 2>/dev/null | grep -q "^${SERVICE}\.service"; then
-    # หยุด agent อื่นก่อน (เพื่อลด conflict)
+
+    echo -e "${NOTE} Stopping conflicting polkit agents..." | tee -a "$LOG"
+    # หยุด agent อื่นก่อนเพื่อลด conflict
     pkill -u "$UID" -f 'polkit-gnome-authentication-agent-1|xfce-polkit|polkit-kde-authentication-agent-1' 2>/dev/null || true
 
+    # สร้าง override ที่ถูกต้อง
     OVERRIDE_DIR="$HOME/.config/systemd/user/${SERVICE}.service.d"
     mkdir -p "$OVERRIDE_DIR"
 
@@ -288,6 +291,7 @@ PartOf=graphical-session.target
 [Service]
 Type=simple
 ExecStart=/usr/bin/hyprpolkitagent
+Restart=on-failure
 
 [Install]
 WantedBy=default.target
@@ -296,13 +300,17 @@ EOF
     systemctl --user daemon-reload >> "$LOG" 2>&1 || true
     systemctl --user enable --now "$SERVICE" >> "$LOG" 2>&1 || true
 
+    sleep 1  # รอสักครู่ให้ service เริ่มทำงาน
+
     if systemctl --user is-active --quiet "$SERVICE"; then
         echo -e "${OK} $SERVICE is running successfully." | tee -a "$LOG"
     else
         echo -e "${WARN} $SERVICE failed to start." | tee -a "$LOG"
+        echo -e "${WARN} Check with: systemctl --user status $SERVICE" | tee -a "$LOG"
     fi
+
 else
-    echo -e "${WARN} $SERVICE.service not found. Skipping..." | tee -a "$LOG"
+    echo -e "${WARN} $SERVICE.service not found. Make sure hyprpolkitagent is installed." | tee -a "$LOG"
 fi
 
 echo -e "${OK} Installation completed successfully!"
