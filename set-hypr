@@ -269,8 +269,49 @@ if [[ $ROG =~ ^[Yy]$ ]]; then
 fi
 
 # hyprpolkitagent
-echo -e "${NOTE} Setting up hyprpolkitagent..."
-systemctl --user enable --now hyprpolkitagent.service 2>/dev/null || true
+# =========================
+# HYPRPOLKITAGENT SETUP
+# =========================
+
+SERVICE="hyprpolkitagent"
+
+echo -e "${NOTE} Setting up $SERVICE..." | tee -a "$LOG"
+
+if systemctl --user list-unit-files 2>/dev/null | grep -q "^${SERVICE}\.service"; then
+
+    # ถ้ามี agent อื่นรันอยู่ → ข้าม
+    if pgrep -u "$UID" -f 'polkit-gnome-authentication-agent-1|xfce-polkit|polkit-kde-authentication-agent-1' >/dev/null 2>&1; then
+        echo -e "${WARN} Another polkit agent is running. Consider removing it." | tee -a "$LOG"
+    fi
+
+    OVERRIDE_DIR="$HOME/.config/systemd/user/${SERVICE}.service.d"
+    OVERRIDE_FILE="$OVERRIDE_DIR/override.conf"
+
+    mkdir -p "$OVERRIDE_DIR"
+
+    cat > "$OVERRIDE_FILE" <<'EOF'
+[Unit]
+After=
+After=dbus.service
+PartOf=
+
+[Install]
+WantedBy=default.target
+EOF
+
+    systemctl --user daemon-reload >> "$LOG" 2>&1 || true
+    systemctl --user enable "$SERVICE" >> "$LOG" 2>&1 || true
+    systemctl --user start "$SERVICE" >> "$LOG" 2>&1 || true
+
+    if systemctl --user is-active --quiet "$SERVICE"; then
+        echo -e "${OK} $SERVICE is running." | tee -a "$LOG"
+    else
+        echo -e "${WARN} $SERVICE is NOT running." | tee -a "$LOG"
+    fi
+
+else
+    echo -e "${WARN} $SERVICE.service not found. Skipping..." | tee -a "$LOG"
+fi
 
 echo -e "${OK} Installation completed successfully!"
 echo -e "${NOTE} Installed Hyprland version: $HYPR_PACKAGE"
