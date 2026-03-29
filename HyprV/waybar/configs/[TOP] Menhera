@@ -1,0 +1,314 @@
+//* ---- 💫 https://github.com/oniichanx 💫 ---- *//
+
+/* Waybar Modules */
+/* NOTE: hyprland-workspaces, Custom Modules & Groups are in separate files */
+
+{
+"include": [
+  "$HOME/.config/waybar/ModulesCustom",
+  "$HOME/.config/waybar/ModulesGroups",
+  ],
+  //"layer": "top",
+  "position": "top",
+  //"mod": "dock",
+  "exclusive": true,
+  "passthrough": false,
+  "gtk-layer-shell": true,
+  "height": 40,
+
+  "modules-right": [
+    //"hyprland/window",
+    "custom/mic",
+    "hyprland/language",
+    "battery",
+    "pulseaudio",
+    "pulseaudio#microphone",
+    "custom/power",
+    "custom/light_dark"
+  ],
+
+  "modules-center": [
+    "clock",
+    "custom/updates"
+  ],
+
+  "modules-left": [
+    "custom/launch_rofi",
+    "hyprland/workspaces",
+    "tray",
+    "network",
+    "cpu"
+  ],
+
+  /* 
+  "hyprland/workspaces": {
+    "disable-scroll": false,
+    "on-scroll-up": "hyprctl dispatch workspace -1",
+    "on-scroll-down": "hyprctl dispatch workspace +1",
+    "format": "{icon}",
+    "format-icons": {
+      "1": "一",
+      "2": "二",
+      "3": "三",
+      "4": "四",
+      "5": "五",
+      "6": "六",
+      "7": "七",
+      "8": "八",
+      "9": "九",
+      "10": "〇"
+      // "active": "",
+      // "default": "󰧞"
+    }
+  },
+  */
+
+  /* 
+  "hyprland/workspaces": {
+    "active-only": false,
+    "all-outputs": true,
+    "format": "{icon}",
+    "on-click": "activate",
+    "on-scroll-up": "hyprctl dispatch workspace e+1",
+    "on-scroll-down": "hyprctl dispatch workspace e-1",
+    "show-special": false,
+    "persistent_workspaces": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": [],
+      "5": []
+    },
+    "format-icons": {
+      "active": " 󰮯 ",
+      "default": "󰊠",
+      "persistent": "󰊠"
+    }
+  },
+  */
+
+  "hyprland/workspaces": {
+    "disable-scroll": true,
+    "all-outputs": true,
+    "on-click": "activate",
+    "format": "{icon}",
+    "format-icons": {
+      "1": "1",
+      "2": "2",
+      "3": "3",
+      "4": "4",
+      "5": "5",
+      "6": "6",
+      "7": "7",
+      "8": "8",
+      "9": "9",
+      "10": "10"
+    }
+  },
+
+  "tray": {
+    "icon-size": 15,
+    "spacing": 10
+  },
+
+  "backlight": {
+    "device": "intel_backlight",
+    "format": "{icon} {percent}%",
+    "format-icons": ["󰃞", "󰃟", "󰃠"],
+    "on-scroll-up": "~/.config/HyprV/waybar/scripts/brightness --inc",
+    "on-scroll-down": "~/.config/HyprV/waybar/scripts/brightness --dec",
+    "min-length": 6
+  },
+
+  "battery": {
+    "states": {
+      "good": 95,
+      "warning": 30,
+      "critical": 20
+    },
+    "format": "{icon} {capacity}%",
+    "format-charging": " {capacity}%",
+    "format-plugged": " {capacity}%",
+    "format-alt": "{time} {icon}",
+    "format-icons": [" ", " ", " ", " ", " ", " ", " ", " ", " ", " "]
+  },
+
+  "clock": {
+    "format": " {:%I:%M %p   %h %d %Y}",
+    "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>",
+    "calendar": {
+      "mode": "month",
+      "mode-mon-col": 3,
+      "on-click-right": "mode",
+      "format": {
+        "months": "<span color='#ffead3'><b>{}</b></span>",
+        "days": "<span color='#ecc6d9'><b>{}</b></span>",
+        "weeks": "<span color='#99ffdd'><b>W{}</b></span>",
+        "weekdays": "<span color='#ffcc66'><b>{}</b></span>",
+        "today": "<span color='#ff6699'><b><u>{}</u></b></span>"
+      }
+    },
+    "actions": {
+      "on-click-right": "mode"
+    }
+  },
+
+  "hyprland/window": {
+    "format": "{}" // <--- this is the default value
+  },
+
+  /* 
+  "network": {
+    "format-wifi": "  {essid}",
+    "format-ethernet": " {essid}",
+    "format-linked": "{ifname} (No IP) ",
+    "format-disconnected": "󰖪 Disconnected",
+    "tooltip-format-wifi": "Signal Strength: {signalStrength}% | Down Speed: {bandwidthDownBits}, Up Speed: {bandwidthUpBits}"
+  },
+  */
+
+  /* 
+  "network": {
+    //"interface": "wlp2*", // (Optional) To force the use of this interface
+    "format-wifi": "  {signalStrength}%",
+    "format-ethernet": "{ipaddr}/{cidr}",
+    "tooltip-format": "{essid} - {ifname} via {gwaddr}",
+    "format-linked": "{ifname} (No IP)",
+    "format-disconnected": "Disconnected ⚠",
+    "format-alt": "{ifname}:{essid} {ipaddr}/{cidr}"
+  },
+  */
+
+  "network": {
+    "interval": 1,
+    "format": "󰣺 Connected",
+    "format-alt": " {bandwidthUpBytes} -  {bandwidthDownBytes}",
+    "format-disconnected": "󰣼 Disconnected"
+  },
+
+  /* 
+  "include": [
+    "~/.config/HyprV/waybar/conf/mesu.jsonc",
+    "~/.config/HyprV/waybar/conf/asus-rog.jsonc",
+    "~/.config/HyprV/waybar/conf/hyprv-util.jsonc"
+  ],
+  */
+
+  "pulseaudio": {
+    "format": "{icon} {volume}%",
+    "tooltip": false,
+    "format-muted": " Muted",
+    "on-click": "~/.config/HyprV/hypr/scripts/Volume.sh --toggle",
+    "on-click-right": "pavucontrol -t 3",
+    "on-scroll-up": "~/.config/HyprV/hypr/scripts/Volume.sh --inc",
+    "on-scroll-down": "~/.config/HyprV/hypr/scripts/Volume.sh --dec",
+    "scroll-step": 5,
+    "format-icons": {
+      "headphone": "",
+      "hands-free": "",
+      "headset": "",
+      "phone": "",
+      "portable": "",
+      "car": "",
+      "default": ["", "", ""]
+    },
+    "tooltip": true,
+    "tooltip-format": "{icon} {desc} | {volume}%"
+  },
+
+  "pulseaudio#microphone": {
+    "format": "{format_source}",
+    "format-source": " {volume}%",
+    "format-source-muted": "  Muted",
+    "on-click": "~/.config/HyprV/hypr/scripts/Volume.sh --toggle-mic",
+    "on-click-right": "pavucontrol -t 4",
+    "on-scroll-up": "~/.config/HyprV/hypr/scripts/Volume.sh --mic-inc",
+    "on-scroll-down": "~/.config/HyprV/hypr/scripts/Volume.sh --mic-dec",
+    "tooltip-format": "{source_desc} | {source_volume}%",
+    "scroll-step": 5
+  },
+
+  "cpu": {
+    "interval": 10,
+    "format": "",
+    "max-length": 10,
+    "format-alt-click": "click-right",
+    "format-alt": " {usage}%",
+    "on-click": "kitty --start-as=fullscreen --title btop sh -c 'btop'"
+  },
+
+  "custom/power": {
+    "format": "󰐥",
+    "on-click": "sh -c '(sleep 0.5s; wlogout --protocol layer-shell)' & disown"
+  },
+
+  "custom/light_dark": {
+    "format": "󰐾",
+    "on-click": "~/.config/HyprV/hypr/scripts/Light_Dark.sh",
+    "tooltip-format": "Default Keybinds\nSUPER + Q = Start Kitty\nSUPER + F4 = Close Window\nSUPER + L = Lock Screen\nSUPER + M = Logout menu\nSUPER + E = File Manager\nSUPER + V = Toggle Float\nSUPER + SPACE = App Launcher\nSUPER + S = Screenshot\nSUPER + T = Switch WaybarLayout\nSUPER + Y = Switch WaybarStyles\nSUPER + U = Wallpaper Select\nSUPER + F = Fake Fullscreen\nALT + V = Open clipboard manager"
+  },
+
+  "custom/mic": {
+    "format": "{}",
+    "return-type": "json",
+    "interval": 1,
+    "exec": "echo '{ \"text\": \"\", \"class\": \"used\" }'",
+    "exec-if": "~/.config/HyprV/hypr/UserScripts/cam.sh"
+  },
+
+  "custom/spotify": {
+    "interval": 1,
+    "return-type": "json",
+    "exec": "waybar_media_display",
+    "exec-if": "pgrep spotify",
+    "on-click": "playerctl --player=spotify play-pause",
+    "escape": true
+  },
+
+  "custom/launch_rofi": {
+    "format": "󱗼",
+    "on-click": "pkill rofi || rofi -show drun -modirun,drun,filebrowser,window",
+    "tooltip": false
+  },
+
+  /* 
+  "custom/updates": {
+    "format": "{}",
+    "exec": "~/.config/HyprV/waybar/scripts/update1-sys",
+    "on-click": "~/.config/HyprV/waybar/scripts/update1-sys update",
+    "interval": 300,
+    "tooltip": true
+  },
+  */
+
+  "custom/updates": {
+    "format": " {}",
+    "exec": "checkupdates | wc -l",
+    "exec-if": "[[ $(checkupdates | wc -l) -gt 0 ]]",
+    "interval": 15,
+    "on-click": "if command -v paru &> /dev/null; then kitty -T update paru -Syu; else kitty -T update yay -Syu; fi && notify-send 'The system has been updated'",
+    "tooltip": true,
+    "tooltip-format": "Left Click: Update System\nArch Linux Only"
+  },
+
+  "hyprland/language": {
+    "interval": 30,
+    "format": " {}",
+    "on-click": "~/.config/HyprV/hypr/scripts/SwitchKeyboardLayout.sh",
+    "signal": 8
+  },
+
+  "custom/wl-gammarelay-temperature": {
+    "format": " {}",
+    "exec": "wl-gammarelay-rs watch {t}",
+    "on-scroll-up": "~/.config/hypr/scripts/brightness.sh temperature-up 100",
+    "on-scroll-down": "~/.config/hypr/scripts/brightness.sh temperature-down 100"
+  },
+
+  "custom/wl-gammarelay-brightness": {
+    "format": " {}",
+    "exec": "wl-gammarelay-rs watch {bp}",
+    "on-scroll-up": "~/.config/hypr/scripts/brightness.sh brightness-up 0.05",
+    "on-scroll-down": "~/.config/hypr/scripts/brightness.sh brightness-down 0.05"
+  }
+}

@@ -1,0 +1,156 @@
+format = """\
+[╭╴](fg:arrow)\
+$username\
+$directory\
+$time\
+(\
+    $git_branch\
+    $git_status\
+)\
+(\
+    $python\
+    $rust\
+    $nodejs\
+)\
+$cmd_duration
+[╰─](fg:arrow)$character\
+"""
+# Add the modules you need
+ 
+# Disables the blank line at the start of the prompt
+add_newline = true
+ 
+palette = "adwaita-dark"
+ 
+ 
+[palettes.adwaita-dark]
+arrow = "#ED9827"
+os = "#FFFFFF"
+os_admin = "#FFFFFF"
+directory = "#c061cb"
+time = "#FFDC72"
+git = "#f5c211"
+git_status = "#ff7800"
+clang = "#67E3FF"
+rust = "#ffffff"
+java = "#FF52A3"
+python = "#B4F9F8"
+node = "#81FF85"
+conda = "#BAF5C0"
+duration = "#91FFE7"
+text_color = "#26272A"
+text_light = "#26272A"
+custom_quiz = "#ffffff"
+ 
+[username]
+style_user = 'os'
+style_root = 'os_admin'
+format = '👻'
+#format = '[]($style)[󱫱  ](bg:$style fg:text_color)[]($style)'
+disabled = false
+show_always = true
+ 
+[character]
+success_symbol = "[󰍟](fg:arrow)"
+error_symbol = "[󰍟](fg:red)"
+ 
+[directory]
+format = " [](fg:directory)[  $path ]($style)[$read_only]($read_only_style)[](fg:directory)"
+truncation_length = 2
+style = "fg:text_color bg:directory"
+read_only_style = "fg:text_color bg:directory"
+before_repo_root_style = "fg:text_color bg:directory"
+truncation_symbol = "…/"
+truncate_to_repo = true
+read_only ="  "
+ 
+[custom.quiz]
+detect_extensions = ['.qz']
+detect_files = ['01.qz']
+format = '[]($style)["🎀 ONIICHNAX Quiz "](bg:$style fg:text_color)[]($style)'
+style = "fg:text_color bg:time"
+ 
+ 
+[time]
+disabled = true
+format = " [](fg:time)[ $time]($style)[](fg:time)"
+time_format = "%H:%M"
+style = "fg:text_color bg:time"
+ 
+[cmd_duration]
+format = " [](fg:duration)[ $duration]($style)[](fg:duration)"
+style = "fg:text_light bg:duration"
+min_time = 500
+disabled = true
+ 
+[git_branch]
+format = " [](fg:git)[$symbol$branch](fg:text_light bg:git)[](fg:git)"
+symbol = " "
+ 
+[git_status]
+format = '([ ](fg:git_status)[ $all_status$ahead_behind ]($style)[](fg:git_status))'
+style = "fg:text_light bg:git_status"
+disabled = false
+ 
+[docker_context]
+disabled=true
+symbol = " "
+ 
+[package]
+disabled=true
+ 
+ 
+[nodejs]
+format = "[ ](fg:node)[$symbol$version]($style)[](fg:node)"
+style = "bg:node fg:text_light"
+symbol = " "
+version_format = "${raw}"
+disabled=false
+ 
+[rust]
+format ='[ ](fg:rust)[$symbol$version](bg:rust fg:text_color)[](fg:rust)'
+symbol = "🦀 "
+version_format = "${raw}"
+style = "fg:text_light bg:python"
+disabled=false
+ 
+[python]
+disabled=true
+format = '[ ](fg:python)[${symbol}${pyenv_prefix}(${version} )(\($virtualenv\))]($style)[](fg:python)'
+symbol = " "
+version_format = "${raw}"
+style = "fg:text_light bg:python"
+ 
+[os.symbols]
+Alpine = " "
+Amazon = " "
+Android = " "
+Arch = " "
+CentOS = " "
+Debian = " "
+DragonFly = " "
+Emscripten = " "
+EndeavourOS = " "
+Fedora = " "
+FreeBSD = " "
+Gentoo = " "
+Linux = " "
+Macos = " "
+Manjaro = " "
+Mariner = " "
+MidnightBSD = " "
+Mint = " "
+NetBSD = " "
+NixOS = " "
+openSUSE = " "
+Pop = " "
+Raspbian = " "
+Redhat = " "
+RedHatEnterprise = " "
+Redox = " "
+SUSE = " "
+Ubuntu = " "
+Unknown = " "
+Windows = " "
+#ONIICHANX = "󱫱  "
+ONIICHANX = "👻 "

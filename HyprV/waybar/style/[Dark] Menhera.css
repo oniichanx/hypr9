@@ -1,0 +1,178 @@
+@define-color bg0   #211a17;
+@define-color bg1   #362f2b;
+@define-color tip   #221e1b;
+@define-color accent #8be9fd;
+@define-color text #ffffff;
+
+* {
+  border: none;
+  border-radius: 0;
+  font-family: JetBrainsMono NF;
+  font-weight: bold;
+  font-size: 14px;
+  min-height: 0px;
+}
+
+window#waybar {
+  opacity: 0.8;
+  background: @bg0;
+  color: #cdd6f4;
+}
+
+#workspaces button {
+  padding: 5px;
+  color: #ffffff;
+  margin: 3px;
+  border-radius: 30px;
+}
+
+#workspaces button.active {
+  background: @accent;
+  color: @bg0;
+}
+
+#workspaces button:hover {
+  background: @bg0;
+  color: @bg1;
+}
+
+tooltip {
+  background: @tip;
+  border-radius: 10px;
+  border: 3px solid @bg1;
+}
+
+#custom-language, #custom-spotify, #custom-caffeine, #clock, #battery, #pulseaudio, #network, #tray, #backlight, #custom-wl-gammarelay-brightness, #custom-wl-gammarelay-temperature, #workspaces, #window {
+  background: @bg1;
+  color: @text;
+  padding: 0px 10px;
+  margin: 7px 0px;
+  border-radius: 5px;
+}
+
+#cpu {
+  background: @bg1;
+  color: @text;
+  padding: 0px 10px;
+  margin: 7px 5px;
+  border-radius: 5px;
+}
+
+#custom-updates {
+  background: @bg1;
+  color: @text;
+  padding: 0px 10px;
+  margin: 7px 7px;
+  border-radius: 5px;
+}
+
+#custom-menu, #custom-power {
+  background: @accent;
+  font-family: monospace;
+  color: @bg1;
+  padding: 0px 10px;
+  margin: 7px 5px;
+  border-radius: 5px;
+  font-size: 18px;
+}
+
+#custom-power {
+    font-weight: normal;
+}
+
+#tray {
+    margin-left: 5px;
+    padding-left: 10px;
+    padding-right: 10px;
+    transition: none;
+}
+
+#custom-light_dark {
+    color: @bg1;
+    margin-left: -2px;
+    margin-right: 7px;
+    padding-left: 10px;
+    padding-right: 10px;
+    transition: none;
+}
+
+#custom-mic {
+  background: @bg1;
+  padding: 0px 10;
+  margin: 7px 5px;
+  border-radius: 5px;
+}
+
+#custom-mic {
+  margin-right: 5px;
+}
+
+#custom-mic.used {
+  background: @bg1;
+  color: @text1;
+}
+
+#custom-myhyprv {
+  background: @bg1;
+  color: @text1;
+  padding: 0px 10px;
+  margin: 7px 0px;
+  border-radius: 5px;
+}
+
+#custom-launch_rofi {
+  background: @bg1;
+  color: @text;
+  padding: 0px 10px;
+  margin: 7px 5px;
+  border-radius: 5px;
+}
+
+#hyprland-language {
+  background: @bg1;
+  color: @text1;
+  padding: 0px 10px;
+  margin: 7px 0px;
+  border-radius: 5px;
+}
+
+#language {
+  background: @bg1;
+  color: @text1;
+  padding: 0px 10px;
+  margin: 7px 5px;
+  border-radius: 5px;
+}
+
+#window {
+    margin-left: 5px;
+    padding-left: 10px;
+    padding-right: 10px;
+    transition: none;
+}
+
+#workspaces {
+  background: @bg1;
+  padding-right: 10px;
+  padding-left: 5px;
+  margin-left: 5px;
+  margin-right: 5px;
+}
+
+#clock {
+  color: @text;
+  border-radius: 5px;
+  margin-left: 5px;
+}
+
+#network {
+  color: @text;
+  margin-left: 10px;
+  margin-right: 5px;
+}
+
+#pulseaudio, #battery, #custom-wl-gammarelay-brightness, #custom-wl-gammarelay-temperature #custom-spotify {
+  color: @text;
+  margin-right: 5px;
+  margin-left: 5px;
+}

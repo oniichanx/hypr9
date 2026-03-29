@@ -1,0 +1,203 @@
+/* Import external Wallust color configurations */
+@import '../../.config/waybar/wallust/colors-waybar.css';
+
+/* Global Reset */
+* {
+  border: none;
+  border-radius: 0;
+  font-family: JetBrainsMono NF;
+  font-weight: bold;
+  font-size: 14px;
+  min-height: 0px;
+}
+
+/* Waybar Window Styling */
+window#waybar {
+  opacity: 1;
+  background: @color0;  /* Using @color0 defined in colors-waybar.css */
+  color: #cdd6f4;
+}
+
+/* Workspace Button Styling */
+#workspaces button {
+  padding: 5px;
+  color: #ffffff;
+  margin: 3px;
+  border-radius: 30px;
+}
+
+#workspaces button.active {
+  background: @color13;  /* Using @color13 */
+  color: @color0;         /* Using @color0 */
+}
+
+#workspaces button:hover {
+  background: @color0;    /* Using @color0 */
+  color: @color1;         /* Using @color1 */
+}
+
+/* Tooltip Styling */
+tooltip {
+  opacity: 0.8;
+  background: @color2;    /* Using @color2 */
+  border-radius: 10px;
+  border: 3px solid @color1; /* Using @color1 */
+}
+
+/* Custom Waybar Elements */
+#custom-language,
+#custom-spotify,
+#custom-caffeine,
+#clock,
+#battery,
+#pulseaudio,
+#network,
+#tray,
+#backlight,
+#custom-wl-gammarelay-brightness,
+#custom-wl-gammarelay-temperature,
+#workspaces,
+#window {
+  background: @color1;    /* Using @color1 */
+  color: @color7;         /* Using @color7 */
+  padding: 0px 10px;
+  margin: 7px 0px;
+  border-radius: 5px;
+}
+
+#cpu {
+  background: @color1;    /* Using @color1 */
+  color: @color7;         /* Using @color7 */
+  padding: 0px 10px;
+  margin: 7px 5px;
+  border-radius: 5px;
+}
+
+#custom-updates {
+  background: @color1;    /* Using @color1 */
+  color: @color7;         /* Using @color7 */
+  padding: 0px 10px;
+  margin: 7px 7px;
+  border-radius: 5px;
+}
+
+#custom-menu,
+#custom-power {
+  background: @color13;   /* Using @color13 */
+  font-family: monospace;
+  color: @color1;         /* Using @color1 */
+  padding: 0px 10px;
+  margin: 7px 5px;
+  border-radius: 5px;
+  font-size: 18px;
+}
+
+#custom-power {
+  font-weight: normal;
+}
+
+/* Tray and Light/Dark Customizations */
+#tray {
+  margin-left: 5px;
+  padding-left: 10px;
+  padding-right: 10px;
+  transition: none;
+}
+
+#custom-light_dark {
+  color: @color1;         /* Using @color1 */
+  margin-left: -2px;
+  margin-right: 7px;
+  padding-left: 10px;
+  padding-right: 10px;
+  transition: none;
+}
+
+#custom-mic {
+  background: @color1;
+  padding: 0px 10;
+  margin: 7px 5px;
+  border-radius: 5px;
+}
+
+#custom-mic {
+  margin-right: 5px;
+}
+
+#custom-mic.used {
+  background: #ed192d;
+  color: @color7;
+}
+
+/* MyHyprv and Wofi Launcher */
+#custom-myhyprv {
+  background: @color1;    /* Using @color1 */
+  color: @color7;         /* Using @color7 */
+  padding: 0px 10px;
+  margin: 7px 0px;
+  border-radius: 5px;
+}
+
+#custom-launch_rofi {
+  background: @color1;    /* Using @color1 */
+  color: @color7;         /* Using @color7 */
+  padding: 0px 10px;
+  margin: 7px 5px;
+  border-radius: 5px;
+}
+
+#hyprland-language,
+#language {
+  background: @color1;    /* Using @color1 */
+  color: @color7;         /* Using @color7 */
+  padding: 0px 10px;
+  margin: 7px 5px;
+  border-radius: 5px;
+}
+
+#custom-keyboard {
+  background: @color1;    /* Using @color1 */
+  color: @color7;         /* Using @color7 */
+  padding: 0px 10px;
+  margin: 7px 5px;
+  border-radius: 5px;
+}
+
+/* Window Styling */
+#window {
+  margin-left: 5px;
+  padding-left: 10px;
+  padding-right: 10px;
+  transition: none;
+}
+
+/* Clock, Network, Audio, Battery Styling */
+#workspaces {
+  background: @color1;    /* Using @color1 */
+  padding-right: 10px;
+  padding-left: 5px;
+  margin-left: 5px;
+  margin-right: 5px;
+}
+
+#clock {
+  color: @color7;         /* Using @color7 */
+  border-radius: 5px;
+  margin-left: 5px;
+}
+
+#network {
+  color: @color7;         /* Using @color7 */
+  margin-left: 10px;
+  margin-right: 5px;
+}
+
+#pulseaudio,
+#battery,
+#custom-wl-gammarelay-brightness,
+#custom-wl-gammarelay-temperature,
+#custom-spotify {
+  color: @color7;         /* Using @color7 */
+  margin-right: 5px;
+  margin-left: 5px;
+}
