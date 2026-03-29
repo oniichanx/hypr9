@@ -1,15 +1,35 @@
 #!/bin/bash
 set -euo pipefail
 
-# Colors
-OK="$(tput setaf 2)[OK]$(tput sgr0)"
-ERROR="$(tput setaf 1)[ERROR]$(tput sgr0)"
-NOTE="$(tput setaf 3)[NOTE]$(tput sgr0)"
-INFO="$(tput setaf 4)[INFO]$(tput sgr0)"
-WARN="$(tput setaf 1)[WARN]$(tput sgr0)"
+# ================== Colors (safe fallback สำหรับ minimal) ==================
+# [MINIMAL FIX #1] tput อาจไม่มีบน minimal install
+if command -v tput &>/dev/null && tput setaf 1 &>/dev/null; then
+    OK="$(tput setaf 2)[OK]$(tput sgr0)"
+    ERROR="$(tput setaf 1)[ERROR]$(tput sgr0)"
+    NOTE="$(tput setaf 3)[NOTE]$(tput sgr0)"
+    INFO="$(tput setaf 4)[INFO]$(tput sgr0)"
+    WARN="$(tput setaf 1)[WARN]$(tput sgr0)"
+else
+    OK="[OK]"
+    ERROR="[ERROR]"
+    NOTE="[NOTE]"
+    INFO="[INFO]"
+    WARN="[WARN]"
+fi
 
 mkdir -p Install-Logs
 LOG="Install-Logs/install-$(date +%d-%H%M%S).log"
+
+# ================== Trap for cleanup on interrupt ==================
+trap 'echo -e "\n${ERROR} Script interrupted! Check $LOG for details."; exit 1' INT TERM ERR
+
+# ================== ติดตั้ง dependencies ขั้นต่ำก่อนเลย ==================
+# [MINIMAL FIX #2] pciutils (lspci), git, base-devel อาจไม่มีบน minimal
+echo -e "${NOTE} Ensuring base dependencies are installed..."
+sudo pacman -S --noconfirm --needed base-devel git pciutils >> "$LOG" 2>&1 || {
+    echo -e "${ERROR} Failed to install base dependencies. Check $LOG"
+    exit 1
+}
 
 # ================== เลือก AUR Helper ==================
 echo -e "${NOTE} Choose AUR Helper:"
@@ -25,15 +45,18 @@ fi
 
 if ! command -v "$AURHELPER" &>/dev/null; then
     echo -e "${NOTE} Installing $AURHELPER..."
-    sudo pacman -S --noconfirm --needed base-devel git
-    git clone "https://aur.archlinux.org/${AURHELPER}.git"
-    cd "$AURHELPER" && makepkg -si --noconfirm && cd ..
+    ORIG_DIR="$(pwd)"
+    git clone "https://aur.archlinux.org/${AURHELPER}.git" || {
+        echo -e "${ERROR} Failed to clone $AURHELPER from AUR."
+        exit 1
+    }
+    cd "$AURHELPER" && makepkg -si --noconfirm && cd "$ORIG_DIR"
     rm -rf "$AURHELPER"
 fi
 
-ISAUR=$(command -v "$AURHELPER")
+ISAUR="$AURHELPER"
 
-# Progress Bar
+# ================== Progress Bar ==================
 show_progress() {
     local pid=$1
     local pkg=$2
@@ -52,7 +75,7 @@ install_software() {
         echo -e "${NOTE} Installing $1..."
         $ISAUR -S --noconfirm --needed "$1" >> "$LOG" 2>&1 &
         show_progress $! "$1"
-        
+
         if $ISAUR -Q "$1" &>/dev/null; then
             echo -e "${OK} Successfully installed $1"
         else
@@ -84,11 +107,12 @@ install_stage=(
     papirus-icon-theme ttf-jetbrains-mono ttf-jetbrains-mono-nerd
     ttf-droid ttf-fira-code noto-fonts-emoji adobe-source-code-pro-fonts
     otf-font-awesome lxappearance xfce4-settings nwg-look sddm hyprpolkitagent
+    xdg-utils  # [MINIMAL FIX #3] ต้องมีสำหรับ xdg-settings ตอนเลือก browser
 )
 
 clear
 
-# เลือก Hyprland
+# ================== เลือก Hyprland ==================
 echo -e "${NOTE} Select Hyprland version:"
 echo "1) hyprland-git (bleeding-edge)"
 echo "2) hyprland (stable)"
@@ -108,7 +132,8 @@ if [[ ! $CONTINST =~ ^[Yy]$ ]]; then
     exit 0
 fi
 
-# Detect NVIDIA
+# ================== Detect NVIDIA ==================
+# pciutils ถูกติดตั้งไปแล้วข้างบน จึงปลอดภัยที่จะใช้ lspci
 if lspci -k | grep -A 2 -E "(VGA|3D)" | grep -iq nvidia; then
     ISNVIDIA=true
     echo -e "${NOTE} NVIDIA GPU detected."
@@ -116,7 +141,21 @@ else
     ISNVIDIA=false
 fi
 
-# WiFi powersave
+# ================== Detect Bootloader ==================
+# [MINIMAL FIX #5] ไม่ใช่ทุกคนใช้ GRUB บน minimal install
+detect_bootloader() {
+    if [[ -f /boot/grub/grub.cfg ]]; then
+        echo "grub"
+    elif [[ -d /boot/loader/entries ]]; then
+        echo "systemd-boot"
+    else
+        echo "unknown"
+    fi
+}
+BOOTLOADER=$(detect_bootloader)
+echo -e "${INFO} Detected bootloader: $BOOTLOADER" | tee -a "$LOG"
+
+# ================== WiFi powersave ==================
 read -rep $'[\e[1;33mACTION\e[0m] - Disable WiFi powersave? (y/n) ' WIFI
 if [[ $WIFI =~ ^[Yy]$ ]]; then
     sudo mkdir -p /etc/NetworkManager/conf.d
@@ -128,43 +167,73 @@ fi
 # ====================== Install Packages ======================
 read -rep $'[\e[1;33mACTION\e[0m] - Install all packages? (y/n) ' INST
 if [[ $INST =~ ^[Yy]$ ]]; then
-    echo -e "${NOTE} === Prep Stage ==="
+    echo -e "${NOTE} === Prep Stage ===" | tee -a "$LOG"
     for SOFTWR in "${prep_stage[@]}"; do
         install_software "$SOFTWR"
     done
 
     if [[ "$ISNVIDIA" == true ]]; then
-        echo -e "${NOTE} === NVIDIA Setup ==="
+        echo -e "${NOTE} === NVIDIA Setup ===" | tee -a "$LOG"
         for SOFTWR in "${nvidia_stage[@]}"; do
             install_software "$SOFTWR"
         done
-        sudo sed -i 's/MODULES=()/MODULES=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)/' /etc/mkinitcpio.conf
-        sudo mkinitcpio -P
+
+        # ป้องกัน sed ซ้ำ
+        if ! grep -q "nvidia" /etc/mkinitcpio.conf; then
+            sudo sed -i 's/MODULES=()/MODULES=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)/' /etc/mkinitcpio.conf
+        else
+            echo -e "${INFO} NVIDIA modules already in mkinitcpio.conf, skipping."
+        fi
+
+        sudo mkinitcpio -P >> "$LOG" 2>&1 || {
+            echo -e "${WARN} mkinitcpio failed. Check $LOG"
+        }
+
         echo "options nvidia-drm modeset=1" | sudo tee /etc/modprobe.d/nvidia.conf >/dev/null
-        sudo sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="nvidia_drm.modeset=1 /' /etc/default/grub
-        sudo grub-mkconfig -o /boot/grub/grub.cfg
+
+        # [MINIMAL FIX #5] แยก logic ตาม bootloader
+        if [[ "$BOOTLOADER" == "grub" ]]; then
+            if ! grep -q "nvidia_drm.modeset=1" /etc/default/grub; then
+                sudo sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="nvidia_drm.modeset=1 /' /etc/default/grub
+            else
+                echo -e "${INFO} nvidia_drm.modeset=1 already in GRUB config, skipping."
+            fi
+            sudo grub-mkconfig -o /boot/grub/grub.cfg >> "$LOG" 2>&1 || {
+                echo -e "${WARN} grub-mkconfig failed. Check $LOG"
+            }
+        elif [[ "$BOOTLOADER" == "systemd-boot" ]]; then
+            echo -e "${NOTE} systemd-boot detected. Adding nvidia_drm.modeset=1 to kernel options..."
+            for entry in /boot/loader/entries/*.conf; do
+                if grep -q "^options" "$entry" && ! grep -q "nvidia_drm.modeset=1" "$entry"; then
+                    sudo sed -i 's/^options /options nvidia_drm.modeset=1 /' "$entry"
+                    echo -e "${INFO} Updated: $entry"
+                fi
+            done
+        else
+            echo -e "${WARN} Unknown bootloader. Please add nvidia_drm.modeset=1 to kernel parameters manually."
+        fi
     fi
 
-    echo -e "${NOTE} === Installing $HYPR_PACKAGE ==="
+    echo -e "${NOTE} === Installing $HYPR_PACKAGE ===" | tee -a "$LOG"
     install_software "$HYPR_PACKAGE"
 
-    echo -e "${NOTE} === Installing $PORTAL_PACKAGE ==="
+    echo -e "${NOTE} === Installing $PORTAL_PACKAGE ===" | tee -a "$LOG"
     install_software "$PORTAL_PACKAGE"
 
-    echo -e "${NOTE} === Installing Main Packages ==="
+    echo -e "${NOTE} === Installing Main Packages ===" | tee -a "$LOG"
     for SOFTWR in "${install_stage[@]}"; do
         install_software "$SOFTWR"
     done
 
     # Clean conflicting portals
-    echo -e "${NOTE} Removing conflicting xdg-desktop-portals..."
-    sudo pacman -R --noconfirm xdg-desktop-portal-gnome xdg-desktop-portal-gtk 2>/dev/null || true
+    echo -e "${NOTE} Removing conflicting xdg-desktop-portals..." | tee -a "$LOG"
+    sudo pacman -R --noconfirm xdg-desktop-portal-gnome xdg-desktop-portal-gtk >> "$LOG" 2>&1 || true
 
     sudo systemctl enable --now bluetooth.service
     sudo systemctl enable sddm
 fi
 
-### Copy Config Files + Dark Theme ###
+# ====================== Copy Config Files + Dark Theme ======================
 read -rep $'[\e[1;33mACTION\e[0m] - Copy config files? (y/n) ' CFG
 if [[ $CFG =~ ^[Yy]$ ]]; then
     echo -e "${NOTE} Copying config files..."
@@ -185,7 +254,6 @@ if [[ $CFG =~ ^[Yy]$ ]]; then
     cp -r ~/.config/HyprV/rofi/* ~/.config/rofi/ 2>/dev/null || true
     cp -r ~/.config/HyprV/Pictures ~/ 2>/dev/null || true
 
-    # Symlinks (ย่อให้กระชับ)
     ln -sf ~/.config/HyprV/kitty/kitty.conf ~/.config/kitty/kitty.conf 2>/dev/null || true
     cp -r ~/.config/HyprV/kitty/kitty-themes/ ~/.config/kitty/kitty-themes 2>/dev/null || true
 
@@ -200,7 +268,6 @@ if [[ $CFG =~ ^[Yy]$ ]]; then
     ln -sf ~/.config/HyprV/wlogout/icons ~/.config/wlogout/icons 2>/dev/null || true
     ln -sf ~/.config/HyprV/wlogout/style.css ~/.config/wlogout/style.css 2>/dev/null || true
 
-    # Waybar modules
     ln -sf ~/.config/HyprV/waybar/Modules ~/.config/waybar/Modules 2>/dev/null || true
     ln -sf ~/.config/HyprV/waybar/ModulesCustom ~/.config/waybar/ModulesCustom 2>/dev/null || true
     ln -sf ~/.config/HyprV/waybar/ModulesGroups ~/.config/waybar/ModulesGroups 2>/dev/null || true
@@ -211,19 +278,22 @@ if [[ $CFG =~ ^[Yy]$ ]]; then
     ln -sf ~/.config/HyprV/waybar/style ~/.config/waybar/style 2>/dev/null || true
 
     if [[ "$ISNVIDIA" == true ]]; then
-        echo -e "\nsource = ~/.config/hypr/env_var_nvidia.conf" >> ~/.config/hypr/hyprland.conf
+        if ! grep -q "env_var_nvidia.conf" ~/.config/hypr/hyprland.conf 2>/dev/null; then
+            echo -e "\nsource = ~/.config/hypr/env_var_nvidia.conf" >> ~/.config/hypr/hyprland.conf
+        fi
     fi
 
     # Dark Theme + SDDM
     echo -e "${NOTE} Setting up Dark Theme and SDDM..."
     sudo cp -R Extras/sdt /usr/share/sddm/themes/ 2>/dev/null || true
-    sudo chown -R $USER:$USER /usr/share/sddm/themes/sdt 2>/dev/null || true
+    sudo chown -R "$USER:$USER" /usr/share/sddm/themes/sdt 2>/dev/null || true
     sudo mkdir -p /etc/sddm.conf.d
     echo -e "[Theme]\nCurrent=sdt" | sudo tee /etc/sddm.conf.d/10-theme.conf >/dev/null
     sudo cp Extras/hyprland.desktop /usr/share/wayland-sessions/ 2>/dev/null || true
 
     cp -f ~/.config/HyprV/backgrounds/v4-background-dark.jpg /usr/share/sddm/themes/sdt/wallpaper.jpg 2>/dev/null || true
 
+    # gsettings/xfconf อาจไม่มีบน minimal — มี || true แล้ว
     xfconf-query -c xsettings -p /Net/ThemeName -s "Adwaita-dark" 2>/dev/null || true
     xfconf-query -c xsettings -p /Net/IconThemeName -s "Papirus-Dark" 2>/dev/null || true
     gsettings set org.gnome.desktop.interface gtk-theme "Adwaita-dark" 2>/dev/null || true
@@ -232,53 +302,72 @@ if [[ $CFG =~ ^[Yy]$ ]]; then
     echo -e "${OK} Dark theme and SDDM setup completed."
 fi
 
-# Starship, Wallpaper, Browser, ROG
+# ================== Starship ==================
 read -rep $'[\e[1;33mACTION\e[0m] - Enable Starship shell? (y/n) ' STAR
 if [[ $STAR =~ ^[Yy]$ ]]; then
-    echo 'eval "$(starship init bash)"' >> ~/.bashrc
+    if ! grep -q 'starship init bash' ~/.bashrc 2>/dev/null; then
+        echo 'eval "$(starship init bash)"' >> ~/.bashrc
+    fi
     cp Extras/starship.toml ~/.config/ 2>/dev/null || true
 fi
 
+# ================== Wallpaper ==================
 read -rep $'[\e[1;33mACTION\e[0m] - Enable wallpaper on startup? (y/n) ' SET_WALLPAPER
 if [[ $SET_WALLPAPER =~ ^[Yy]$ ]]; then
     sed -i 's|#exec-once = ~/.config/hypr/startup.sh|exec-once = ~/.config/hypr/startup.sh|' ~/.config/hypr/hyprland.conf 2>/dev/null || true
 fi
 
+# ================== Default Browser ==================
+# [MINIMAL FIX #3] xdg-utils อยู่ใน install_stage แล้ว แต่ถ้าข้าม install stage ให้ check ก่อน
 echo -e "${NOTE} Choose default browser (1=Librewolf, 2=Firefox, 3=Brave):"
-read -p "Choice: " choice
-case $choice in
-    1) xdg-settings set default-web-browser librewolf.desktop ;;
-    2) xdg-settings set default-web-browser firefox.desktop ;;
-    3) xdg-settings set default-web-browser brave.desktop ;;
-    *) xdg-settings set default-web-browser firefox.desktop ;;
-esac
+read -rep $'[\e[1;33mACTION\e[0m] - Choice: ' BROWSER_CHOICE
+if command -v xdg-settings &>/dev/null; then
+    case $BROWSER_CHOICE in
+        1) xdg-settings set default-web-browser librewolf.desktop ;;
+        2) xdg-settings set default-web-browser firefox.desktop ;;
+        3) xdg-settings set default-web-browser brave.desktop ;;
+        *) xdg-settings set default-web-browser firefox.desktop ;;
+    esac
+else
+    echo -e "${WARN} xdg-settings not found. Set default browser manually after reboot."
+fi
 
-# ROG
+# ================== ASUS ROG ==================
 read -rep $'[\e[1;33mACTION\e[0m] - Install ASUS ROG support? (y/n) ' ROG
 if [[ $ROG =~ ^[Yy]$ ]]; then
-    echo -e "${NOTE} Setting up ASUS ROG support..."
-    sudo pacman-key --recv-keys 8F654886F17D497FEFE3DB448B15A6B0E9A3FA35 &>>$LOG
-    sudo pacman-key --lsign-key 8F654886F17D497FEFE3DB448B15A6B0E9A3FA35 &>>$LOG
-    echo -e "\n[g14]\nServer = https://arch.asus-linux.org" | sudo tee -a /etc/pacman.conf &>>$LOG
-    sudo pacman -Suy --noconfirm &>>$LOG
+    echo -e "${NOTE} Setting up ASUS ROG support..." | tee -a "$LOG"
+    sudo pacman-key --recv-keys 8F654886F17D497FEFE3DB448B15A6B0E9A3FA35 &>>"$LOG"
+    sudo pacman-key --lsign-key 8F654886F17D497FEFE3DB448B15A6B0E9A3FA35 &>>"$LOG"
+
+    if ! grep -q "\[g14\]" /etc/pacman.conf; then
+        echo -e "\n[g14]\nServer = https://arch.asus-linux.org" | sudo tee -a /etc/pacman.conf &>>"$LOG"
+    fi
+
+    sudo pacman -Suy --noconfirm &>>"$LOG"
     install_software asusctl
     install_software supergfxctl
     install_software rog-control-center
     sudo systemctl enable --now power-profiles-daemon.service supergfxd
-    echo -e "\nsource = ~/.config/hypr/rog-g15-strix-2021-binds.conf" >> ~/.config/hypr/hyprland.conf
+
+    if ! grep -q "rog-g15-strix-2021-binds.conf" ~/.config/hypr/hyprland.conf 2>/dev/null; then
+        echo -e "\nsource = ~/.config/hypr/rog-g15-strix-2021-binds.conf" >> ~/.config/hypr/hyprland.conf
+    fi
 fi
 
-# hyprpolkitagent
+# ================== hyprpolkitagent ==================
 SERVICE="hyprpolkitagent"
 echo -e "${NOTE} Setting up $SERVICE..." | tee -a "$LOG"
 
-if systemctl --user list-unit-files 2>/dev/null | grep -q "^${SERVICE}\.service"; then
+# [MINIMAL FIX #6] systemctl --user ต้องการ dbus/systemd user session
+# ถ้ายังไม่มี session (เช่น รันจาก TTY บน minimal) จะ fail — ตรวจสอบก่อน
+if ! systemctl --user status &>/dev/null; then
+    echo -e "${WARN} systemd user session not available. $SERVICE will be enabled on next login." | tee -a "$LOG"
+    systemctl --user enable "$SERVICE" >> "$LOG" 2>&1 || true
+elif systemctl --user list-unit-files 2>/dev/null | grep -q "^${SERVICE}\.service"; then
 
     echo -e "${NOTE} Stopping other polkit agents to prevent conflict..." | tee -a "$LOG"
-    # หยุด agent อื่นก่อน
     pkill -u "$UID" -f 'polkit-gnome-authentication-agent-1|xfce-polkit|polkit-kde-authentication-agent-1' 2>/dev/null || true
 
-    # ลบ override เก่าเพื่อความสะอาด
     rm -rf "$HOME/.config/systemd/user/${SERVICE}.service.d" 2>/dev/null || true
 
     systemctl --user daemon-reload >> "$LOG" 2>&1 || true
@@ -291,13 +380,19 @@ if systemctl --user list-unit-files 2>/dev/null | grep -q "^${SERVICE}\.service"
     else
         echo -e "${WARN} $SERVICE is not active. You may need to restart it manually after reboot." | tee -a "$LOG"
     fi
-
 else
     echo -e "${WARN} $SERVICE.service not found. Skipping..." | tee -a "$LOG"
 fi
 
-echo -e "${OK} Installation completed successfully!"
-echo -e "${NOTE} Installed Hyprland version: $HYPR_PACKAGE"
+# ================== Final Verification ==================
+echo ""
+if $ISAUR -Q "$HYPR_PACKAGE" &>/dev/null; then
+    echo -e "${OK} Installation completed successfully!"
+    echo -e "${NOTE} Installed Hyprland version: $HYPR_PACKAGE"
+    echo -e "${NOTE} Detected bootloader: $BOOTLOADER"
+else
+    echo -e "${WARN} Installation finished but $HYPR_PACKAGE may not be installed correctly. Check $LOG"
+fi
 
 read -rep $'[\e[1;33mACTION\e[0m] - Reboot now? (y/n) ' REBOOT
 if [[ $REBOOT =~ ^[Yy]$ ]]; then
