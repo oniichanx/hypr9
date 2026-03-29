@@ -274,46 +274,26 @@ echo -e "${NOTE} Setting up $SERVICE..." | tee -a "$LOG"
 
 if systemctl --user list-unit-files 2>/dev/null | grep -q "^${SERVICE}\.service"; then
 
-    echo -e "${NOTE} Stopping conflicting polkit agents..." | tee -a "$LOG"
+    echo -e "${NOTE} Stopping other polkit agents to prevent conflict..." | tee -a "$LOG"
+    # หยุด agent อื่นก่อน
     pkill -u "$UID" -f 'polkit-gnome-authentication-agent-1|xfce-polkit|polkit-kde-authentication-agent-1' 2>/dev/null || true
 
-    # ลบ override เก่าเพื่อป้องกัน duplicate ExecStart
-    rm -rf "$HOME/.config/systemd/user/${SERVICE}.service.d"
-
-    # สร้าง override ใหม่ที่ถูกต้อง
-    OVERRIDE_DIR="$HOME/.config/systemd/user/${SERVICE}.service.d"
-    mkdir -p "$OVERRIDE_DIR"
-
-    cat > "$OVERRIDE_DIR/override.conf" <<'EOF'
-[Unit]
-Description=Hyprland Polkit Authentication Agent
-After=dbus.service
-PartOf=graphical-session.target
-
-[Service]
-Type=simple
-ExecStart=/usr/bin/hyprpolkitagent
-Restart=on-failure
-RestartSec=3
-
-[Install]
-WantedBy=default.target
-EOF
+    # ลบ override เก่าเพื่อความสะอาด
+    rm -rf "$HOME/.config/systemd/user/${SERVICE}.service.d" 2>/dev/null || true
 
     systemctl --user daemon-reload >> "$LOG" 2>&1 || true
     systemctl --user enable --now "$SERVICE" >> "$LOG" 2>&1 || true
 
-    sleep 2
+    sleep 1.5
 
     if systemctl --user is-active --quiet "$SERVICE"; then
         echo -e "${OK} $SERVICE is running successfully." | tee -a "$LOG"
     else
-        echo -e "${WARN} $SERVICE failed to start." | tee -a "$LOG"
-        echo -e "${WARN} Run: systemctl --user status $SERVICE" | tee -a "$LOG"
+        echo -e "${WARN} $SERVICE is not active. You may need to restart it manually after reboot." | tee -a "$LOG"
     fi
 
 else
-    echo -e "${WARN} $SERVICE.service not found. Make sure hyprpolkitagent is installed." | tee -a "$LOG"
+    echo -e "${WARN} $SERVICE.service not found. Skipping..." | tee -a "$LOG"
 fi
 
 echo -e "${OK} Installation completed successfully!"
