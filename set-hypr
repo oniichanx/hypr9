@@ -206,7 +206,13 @@ if [[ $INST =~ ^[Yy]$ ]]; then
         done
 
         if ! grep -q "nvidia" /etc/mkinitcpio.conf; then
-            sudo sed -i 's/MODULES=()/MODULES=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)/' /etc/mkinitcpio.conf
+            # ตรวจว่า pattern MODULES=() มีจริงก่อน sed ถ้าไม่มีจะ skip แทนที่จะแก้ผิด
+            if grep -q "^MODULES=()" /etc/mkinitcpio.conf; then
+                sudo sed -i 's/MODULES=()/MODULES=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)/' /etc/mkinitcpio.conf
+                echo -e "${OK} NVIDIA modules added to mkinitcpio.conf"
+            else
+                echo -e "${WARN} MODULES=() pattern not found in mkinitcpio.conf — edit manually: /etc/mkinitcpio.conf"
+            fi
         else
             echo -e "${INFO} NVIDIA modules already in mkinitcpio.conf, skipping."
         fi
@@ -219,7 +225,13 @@ if [[ $INST =~ ^[Yy]$ ]]; then
 
         if [[ "$BOOTLOADER" == "grub" ]]; then
             if ! grep -q "nvidia_drm.modeset=1" /etc/default/grub; then
-                sudo sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="nvidia_drm.modeset=1 /' /etc/default/grub
+                # ตรวจว่า pattern GRUB_CMDLINE_LINUX_DEFAULT=" มีจริงก่อน sed
+                if grep -q '^GRUB_CMDLINE_LINUX_DEFAULT="' /etc/default/grub; then
+                    sudo sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="nvidia_drm.modeset=1 /' /etc/default/grub
+                    echo -e "${OK} nvidia_drm.modeset=1 added to GRUB config"
+                else
+                    echo -e "${WARN} GRUB_CMDLINE_LINUX_DEFAULT pattern not found — edit manually: /etc/default/grub"
+                fi
             else
                 echo -e "${INFO} nvidia_drm.modeset=1 already in GRUB config, skipping."
             fi
@@ -262,15 +274,16 @@ read -rep $'[\e[1;33mACTION\e[0m] - Copy config files? (y/n) ' CFG
 if [[ $CFG =~ ^[Yy]$ ]]; then
     echo -e "${NOTE} Copying config files..."
 
-    cp -R HyprV ~/.config/ 2>/dev/null || echo -e "${WARN} HyprV folder not found!"
+    # ตรวจว่า HyprV มีอยู่จริงก่อน ถ้าไม่มีให้หยุดทันที ไม่งั้น symlink ทั้งหมดจะชี้ไปที่ว่าง
+    if [[ ! -d "HyprV" ]]; then
+        echo -e "${ERROR} HyprV folder not found in $(pwd)! Aborting config copy."
+        exit 1
+    fi
+
+    cp -R HyprV ~/.config/
 
     for DIR in hypr kitty swaync swaylock waybar wlogout rofi; do
-        DIRPATH=~/.config/$DIR
-        if [ -d "$DIRPATH" ]; then
-            echo -e "${NOTE} Backing up $DIR..."
-            mv "$DIRPATH" "${DIRPATH}-backup" 2>/dev/null || true
-        fi
-        mkdir -p "$DIRPATH"
+        mkdir -p ~/.config/$DIR
     done
 
     echo -e "${NOTE} Linking config files..."
