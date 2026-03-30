@@ -102,7 +102,6 @@ install_software() {
     if $AURHELPER -Q "$1" &>/dev/null; then
         echo -e "${INFO} $1 already installed."
     else
-        echo -e "${NOTE} Installing $1..."
         $AURHELPER -S --noconfirm --needed "$1" >> "$LOG" 2>&1 &
         local pkg_pid=$!
 
@@ -276,32 +275,46 @@ if [[ $CFG =~ ^[Yy]$ ]]; then
 
     echo -e "${NOTE} Linking config files..."
 
+    # [hyprland] cp (ไม่ใช่ ln) เพราะ hyprland.conf ถูก append nvidia/rog ทีหลัง
     cp -r ~/.config/HyprV/hypr/* ~/.config/hypr/ 2>/dev/null || true
+
+    # [rofi] cp — config.rasi + themes/ + launcher scripts
     cp -r ~/.config/HyprV/rofi/* ~/.config/rofi/ 2>/dev/null || true
+
+    # [wallpaper] cp ไปไว้ ~/Pictures/ ให้ swww ใช้ตอน startup
     cp -r ~/.config/HyprV/Pictures ~/ 2>/dev/null || true
 
+    # [kitty] ln: kitty.conf (live-update) / cp: themes (static)
     ln -sf ~/.config/HyprV/kitty/kitty.conf ~/.config/kitty/kitty.conf 2>/dev/null || true
     cp -r ~/.config/HyprV/kitty/kitty-themes/ ~/.config/kitty/kitty-themes 2>/dev/null || true
 
+    # [swaync] ln: config.json, style.css, icons/, images/ — restart: swaync -R && swaync
     ln -sf ~/.config/HyprV/swaync/config.json ~/.config/swaync/config.json 2>/dev/null || true
     ln -sf ~/.config/HyprV/swaync/style.css ~/.config/swaync/style.css 2>/dev/null || true
     ln -sf ~/.config/HyprV/swaync/icons ~/.config/swaync 2>/dev/null || true
     ln -sf ~/.config/HyprV/swaync/images ~/.config/swaync 2>/dev/null || true
 
+    # [waybar] layout + theme default — เปลี่ยนแค่ชี้ symlink ใหม่ไปที่ configs/ หรือ style/
     ln -sf ~/.config/HyprV/waybar/configs/[TOP]\ Simple ~/.config/waybar/config 2>/dev/null || true
     ln -sf ~/.config/HyprV/waybar/style/[Colored]\ Translucent.css ~/.config/waybar/style.css 2>/dev/null || true
 
+    # [wlogout] ln: layout, icons/, style.css — check: ls -la ~/.config/wlogout/
     ln -sf ~/.config/HyprV/wlogout/layout ~/.config/wlogout/layout 2>/dev/null || true
     ln -sf ~/.config/HyprV/wlogout/icons ~/.config/wlogout/icons 2>/dev/null || true
     ln -sf ~/.config/HyprV/wlogout/style.css ~/.config/wlogout/style.css 2>/dev/null || true
 
+    # [waybar modules] ln: Modules, Custom, Groups, Workspaces, Vertical — reload: killall waybar && waybar &
     ln -sf ~/.config/HyprV/waybar/Modules ~/.config/waybar/Modules 2>/dev/null || true
     ln -sf ~/.config/HyprV/waybar/ModulesCustom ~/.config/waybar/ModulesCustom 2>/dev/null || true
     ln -sf ~/.config/HyprV/waybar/ModulesGroups ~/.config/waybar/ModulesGroups 2>/dev/null || true
     ln -sf ~/.config/HyprV/waybar/ModulesWorkspaces ~/.config/waybar/ModulesWorkspaces 2>/dev/null || true
     ln -sf ~/.config/HyprV/waybar/ModulesVertical ~/.config/waybar/ModulesVertical 2>/dev/null || true
+
+    # [wallust] ln: waybar/wallust (color template) + ~/.config/wallust (config หลัก) — fix: wallust run ~/Pictures/<img>
     ln -sf ~/.config/HyprV/waybar/wallust ~/.config/waybar/wallust 2>/dev/null || true
     ln -sf ~/.config/HyprV/wallust ~/.config/wallust 2>/dev/null || true
+
+    # [waybar style folder] ln: style/ ทั้งโฟลเดอร์ — ต้องมีก่อนเพราะ style.css ชี้ไฟล์ข้างใน
     ln -sf ~/.config/HyprV/waybar/style ~/.config/waybar/style 2>/dev/null || true
 
     if [[ "$ISNVIDIA" == true ]]; then
