@@ -283,7 +283,12 @@ if [[ $CFG =~ ^[Yy]$ ]]; then
     cp -R HyprV ~/.config/
 
     for DIR in hypr kitty swaync swaylock waybar wlogout rofi; do
-        mkdir -p ~/.config/$DIR
+        DIRPATH=~/.config/$DIR
+        if [ -d "$DIRPATH" ]; then
+            echo -e "${NOTE} Backing up $DIR..."
+            mv "$DIRPATH" "${DIRPATH}-backup" 2>/dev/null || true
+        fi
+        mkdir -p "$DIRPATH"
     done
 
     echo -e "${NOTE} Linking config files..."
