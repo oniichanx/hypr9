@@ -205,10 +205,10 @@ fi
 # ================== เลือกโหมดการติดตั้ง ==================
 echo -e ""
 echo -e "${NOTE} Choose Installation Mode:"
-echo "1) Single Package Mode (Stable - แนะนำสำหรับครั้งแรก)"
-echo "   → ติดตั้งทีละ package มี progress ชัดเจน ปลอดภัยกว่า"
-echo "2) Batch Mode (Fast - โหลดหลายไฟล์พร้อมกัน)"
-echo "   → เร็วขึ้นมาก เหมาะกับเครื่องแรง"
+echo "1) Single Package Mode (Stable - Recommended for first install)"
+echo "   → Install packages one by one with clear progress. Safer."
+echo "2) Batch Mode (Fast - Install all at once)"
+echo "   → Much faster on powerful machines."
 read -rep $'[\e[1;33mACTION\e[0m] - Enter 1 or 2: ' MODECHOICE
 
 if [[ $MODECHOICE == "2" ]]; then
@@ -225,7 +225,7 @@ if [[ $INST =~ ^[Yy]$ ]]; then
 
     echo -e "${NOTE} === Starting package installation ===" | tee -a "$LOG"
 
-if [[ "$MODE" == "batch" ]]; then
+    if [[ "$MODE" == "batch" ]]; then
         # ====================== BATCH MODE (Fast) ======================
         ALL_PACKAGES=(
             "${prep_stage[@]}"
@@ -263,7 +263,6 @@ if [[ "$MODE" == "batch" ]]; then
             tail -n 40 "$LOG"
             exit 1
         fi
-    fi
 
     else
         # ====================== SINGLE MODE (Stable) ======================
