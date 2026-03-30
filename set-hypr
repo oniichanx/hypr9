@@ -225,46 +225,98 @@ if [[ $INST =~ ^[Yy]$ ]]; then
 
     echo -e "${NOTE} === Starting package installation ===" | tee -a "$LOG"
 
-    if [[ "$MODE" == "batch" ]]; then
-        # ====================== BATCH MODE (Fast) ======================
-        ALL_PACKAGES=(
-            "${prep_stage[@]}"
-            "$HYPR_PACKAGE"
-            "$PORTAL_PACKAGE"
-            "${install_stage[@]}"
-        )
+if [[ "$MODE" == "batch" ]]; then
+    echo -e "${WARN} Batch Mode (Safe Fast) selected"
 
-        if [[ "$ISNVIDIA" == true ]]; then
-            ALL_PACKAGES+=("${nvidia_stage[@]}")
-            echo -e "${NOTE} NVIDIA detected → Including nvidia-open-dkms"
+    # ====================== Split Packages ======================
+    PACMAN_PKGS=(
+        "${prep_stage[@]}"
+        "$HYPR_PACKAGE"
+        "$PORTAL_PACKAGE"
+        "${install_stage[@]}"
+    )
+
+    AUR_PKGS=()
+
+    # แยก AUR (คร่าว ๆ)
+    for pkg in "${PACMAN_PKGS[@]}"; do
+        if ! pacman -Si "$pkg" &>/dev/null; then
+            AUR_PKGS+=("$pkg")
         fi
+    done
 
-        echo -e "${WARN} Starting batch installation of ${#ALL_PACKAGES[@]} packages..."
+    # NVIDIA
+    if [[ "$ISNVIDIA" == true ]]; then
+        echo -e "${NOTE} NVIDIA detected → Including drivers"
+        for pkg in "${nvidia_stage[@]}"; do
+            if pacman -Si "$pkg" &>/dev/null; then
+                PACMAN_PKGS+=("$pkg")
+            else
+                AUR_PKGS+=("$pkg")
+            fi
+        done
+    fi
 
-        $AURHELPER -S --noconfirm --needed --sudoloop "${ALL_PACKAGES[@]}" >> "$LOG" 2>&1 &
-        batch_pid=$!
+    echo -e "${NOTE} Pacman packages: ${#PACMAN_PKGS[@]}"
+    echo -e "${NOTE} AUR packages: ${#AUR_PKGS[@]}"
 
-        echo -ne "${NOTE} Installing all packages "
+    echo -e "${NOTE} === Installing Pacman packages ==="
 
-        while kill -0 "$batch_pid" 2>/dev/null; do
+    # ====================== PACMAN (เร็ว + ปลอดภัย) ======================
+    if sudo pacman -S --noconfirm --needed "${PACMAN_PKGS[@]}" 2>&1 | tee -a "$LOG"; then
+        echo -e "${OK} Pacman packages installed"
+    else
+        echo -e "${ERROR} Pacman install failed"
+        exit 1
+    fi
+
+    # ====================== AUR (foreground ปลอดภัย) ======================
+    if (( ${#AUR_PKGS[@]} > 0 )); then
+        echo -e "${NOTE} === Installing AUR packages ==="
+        echo -e "${WARN} This step may take time..."
+
+        # กัน hang ด้วย timeout
+        (
+            $AURHELPER -S --noconfirm --needed "${AUR_PKGS[@]}" 2>&1 | tee -a "$LOG"
+        ) &
+        aur_pid=$!
+
+        # spinner + timeout
+        MAX_TIME=3600   # 1 ชั่วโมง
+        START_TIME=$(date +%s)
+
+        echo -ne "${NOTE} Installing AUR packages "
+
+        while kill -0 "$aur_pid" 2>/dev/null; do
             echo -n "."
-            sleep 0.8
+            sleep 1
+
+            NOW=$(date +%s)
+            if (( NOW - START_TIME > MAX_TIME )); then
+                echo -e "\n${ERROR} Timeout! Killing AUR install..."
+                kill -9 "$aur_pid" 2>/dev/null || true
+                exit 1
+            fi
         done
 
-        wait "$batch_pid"
-        exit_code=$?
+        wait "$aur_pid"
+        AUR_EXIT=$?
+
         echo ""
 
-        if [[ $exit_code -eq 0 ]]; then
-            echo -e " ${OK} Batch installation completed successfully!"
+        if [[ $AUR_EXIT -eq 0 ]]; then
+            echo -e "${OK} AUR packages installed"
         else
-            echo -e " ${ERROR} Batch installation had errors."
-            echo -e "${NOTE} Last 40 lines of log:"
+            echo -e "${ERROR} AUR install failed"
+            echo -e "${NOTE} Last 40 lines:"
             tail -n 40 "$LOG"
             exit 1
         fi
+    fi
 
-    else
+    echo -e "${OK} Batch installation completed successfully!"
+
+else
         # ====================== SINGLE MODE (Stable) ======================
         echo -e "${NOTE} === Prep Stage ===" | tee -a "$LOG"
         for SOFTWR in "${prep_stage[@]}"; do
