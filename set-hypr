@@ -2,7 +2,6 @@
 set -euo pipefail
 
 # ================== Colors (safe fallback สำหรับ minimal) ==================
-# [MINIMAL FIX #1] tput อาจไม่มีบน minimal install
 if command -v tput &>/dev/null && tput setaf 1 &>/dev/null; then
     OK="$(tput setaf 2)[OK]$(tput sgr0)"
     ERROR="$(tput setaf 1)[ERROR]$(tput sgr0)"
@@ -24,7 +23,6 @@ LOG="Install-Logs/install-$(date +%d-%H%M%S).log"
 trap 'echo -e "\n${ERROR} Script interrupted! Check $LOG for details."; exit 1' INT TERM ERR
 
 # ================== ติดตั้ง dependencies ขั้นต่ำก่อนเลย ==================
-# [MINIMAL FIX #2] pciutils (lspci), git, base-devel อาจไม่มีบน minimal
 echo -e "${NOTE} Ensuring base dependencies are installed..."
 sudo pacman -S --noconfirm --needed base-devel git pciutils >> "$LOG" 2>&1 || {
     echo -e "${ERROR} Failed to install base dependencies. Check $LOG"
@@ -87,8 +85,6 @@ if ! command -v "$AURHELPER" &>/dev/null; then
     rm -rf "$AURHELPER"
 fi
 
-ISAUR="$AURHELPER"
-
 # ================== Progress Bar ==================
 show_progress() {
     local pid=$1
@@ -98,21 +94,22 @@ show_progress() {
         echo -n "."
         sleep 1.5
     done
-    echo -e " ${OK} Done!"
+    wait "$pid"
+    return $?
 }
 
 install_software() {
-    if $ISAUR -Q "$1" &>/dev/null; then
+    if $AURHELPER -Q "$1" &>/dev/null; then
         echo -e "${INFO} $1 already installed."
     else
         echo -e "${NOTE} Installing $1..."
-        $ISAUR -S --noconfirm --needed "$1" >> "$LOG" 2>&1 &
-        show_progress $! "$1"
+        $AURHELPER -S --noconfirm --needed "$1" >> "$LOG" 2>&1 &
+        local pkg_pid=$!
 
-        if $ISAUR -Q "$1" &>/dev/null; then
-            echo -e "${OK} Successfully installed $1"
+        if show_progress "$pkg_pid" "$1"; then
+            echo -e " ${OK} Successfully installed $1"
         else
-            echo -e "${ERROR} Failed to install $1. Check $LOG"
+            echo -e " ${ERROR} Failed to install $1. Check $LOG"
             exit 1
         fi
     fi
@@ -166,7 +163,6 @@ if [[ ! $CONTINST =~ ^[Yy]$ ]]; then
 fi
 
 # ================== Detect NVIDIA ==================
-# pciutils ถูกติดตั้งไปแล้วข้างบน จึงปลอดภัยที่จะใช้ lspci
 if lspci -k | grep -A 2 -E "(VGA|3D)" | grep -iq nvidia; then
     ISNVIDIA=true
     echo -e "${NOTE} NVIDIA GPU detected."
@@ -175,7 +171,6 @@ else
 fi
 
 # ================== Detect Bootloader ==================
-# [MINIMAL FIX #5] ไม่ใช่ทุกคนใช้ GRUB บน minimal install
 detect_bootloader() {
     if [[ -f /boot/grub/grub.cfg ]]; then
         echo "grub"
@@ -211,7 +206,6 @@ if [[ $INST =~ ^[Yy]$ ]]; then
             install_software "$SOFTWR"
         done
 
-        # ป้องกัน sed ซ้ำ
         if ! grep -q "nvidia" /etc/mkinitcpio.conf; then
             sudo sed -i 's/MODULES=()/MODULES=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)/' /etc/mkinitcpio.conf
         else
@@ -224,7 +218,6 @@ if [[ $INST =~ ^[Yy]$ ]]; then
 
         echo "options nvidia-drm modeset=1" | sudo tee /etc/modprobe.d/nvidia.conf >/dev/null
 
-        # [MINIMAL FIX #5] แยก logic ตาม bootloader
         if [[ "$BOOTLOADER" == "grub" ]]; then
             if ! grep -q "nvidia_drm.modeset=1" /etc/default/grub; then
                 sudo sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="nvidia_drm.modeset=1 /' /etc/default/grub
@@ -258,7 +251,6 @@ if [[ $INST =~ ^[Yy]$ ]]; then
         install_software "$SOFTWR"
     done
 
-    # Clean conflicting portals
     echo -e "${NOTE} Removing conflicting xdg-desktop-portals..." | tee -a "$LOG"
     sudo pacman -R --noconfirm xdg-desktop-portal-gnome xdg-desktop-portal-gtk >> "$LOG" 2>&1 || true
 
@@ -284,50 +276,32 @@ if [[ $CFG =~ ^[Yy]$ ]]; then
 
     echo -e "${NOTE} Linking config files..."
 
-    # --- Hyprland core config ---
     cp -r ~/.config/HyprV/hypr/* ~/.config/hypr/ 2>/dev/null || true
-
-    # --- Rofi launcher config ---
     cp -r ~/.config/HyprV/rofi/* ~/.config/rofi/ 2>/dev/null || true
-
-    # --- Wallpapers / Pictures ---
     cp -r ~/.config/HyprV/Pictures ~/ 2>/dev/null || true
 
-    # --- Kitty terminal config + themes ---
     ln -sf ~/.config/HyprV/kitty/kitty.conf ~/.config/kitty/kitty.conf 2>/dev/null || true
     cp -r ~/.config/HyprV/kitty/kitty-themes/ ~/.config/kitty/kitty-themes 2>/dev/null || true
 
-    # --- SwayNC notification center (config, style, icons, images) ---
     ln -sf ~/.config/HyprV/swaync/config.json ~/.config/swaync/config.json 2>/dev/null || true
     ln -sf ~/.config/HyprV/swaync/style.css ~/.config/swaync/style.css 2>/dev/null || true
     ln -sf ~/.config/HyprV/swaync/icons ~/.config/swaync 2>/dev/null || true
     ln -sf ~/.config/HyprV/swaync/images ~/.config/swaync 2>/dev/null || true
 
-    # --- Waybar config (ใช้ layout [TOP] Simple เป็น default) ---
     ln -sf ~/.config/HyprV/waybar/configs/[TOP]\ Simple ~/.config/waybar/config 2>/dev/null || true
-
-    # --- Waybar style (ใช้ theme [Colored] Translucent เป็น default) ---
     ln -sf ~/.config/HyprV/waybar/style/[Colored]\ Translucent.css ~/.config/waybar/style.css 2>/dev/null || true
 
-    # --- Wlogout layout, icons และ style ---
     ln -sf ~/.config/HyprV/wlogout/layout ~/.config/wlogout/layout 2>/dev/null || true
     ln -sf ~/.config/HyprV/wlogout/icons ~/.config/wlogout/icons 2>/dev/null || true
     ln -sf ~/.config/HyprV/wlogout/style.css ~/.config/wlogout/style.css 2>/dev/null || true
 
-    # --- Waybar modules (แยกเป็นกลุ่มๆ ให้ง่ายต่อการแก้ไข) ---
-    ln -sf ~/.config/HyprV/waybar/Modules ~/.config/waybar/Modules 2>/dev/null || true           # modules มาตรฐาน
-    ln -sf ~/.config/HyprV/waybar/ModulesCustom ~/.config/waybar/ModulesCustom 2>/dev/null || true  # modules ที่ custom เพิ่ม
-    ln -sf ~/.config/HyprV/waybar/ModulesGroups ~/.config/waybar/ModulesGroups 2>/dev/null || true  # modules จัดกลุ่ม
-    ln -sf ~/.config/HyprV/waybar/ModulesWorkspaces ~/.config/waybar/ModulesWorkspaces 2>/dev/null || true  # workspace indicators
-    ln -sf ~/.config/HyprV/waybar/ModulesVertical ~/.config/waybar/ModulesVertical 2>/dev/null || true  # layout แนวตั้ง
-
-    # --- Waybar wallust color integration (sync สีกับ wallpaper) ---
+    ln -sf ~/.config/HyprV/waybar/Modules ~/.config/waybar/Modules 2>/dev/null || true
+    ln -sf ~/.config/HyprV/waybar/ModulesCustom ~/.config/waybar/ModulesCustom 2>/dev/null || true
+    ln -sf ~/.config/HyprV/waybar/ModulesGroups ~/.config/waybar/ModulesGroups 2>/dev/null || true
+    ln -sf ~/.config/HyprV/waybar/ModulesWorkspaces ~/.config/waybar/ModulesWorkspaces 2>/dev/null || true
+    ln -sf ~/.config/HyprV/waybar/ModulesVertical ~/.config/waybar/ModulesVertical 2>/dev/null || true
     ln -sf ~/.config/HyprV/waybar/wallust ~/.config/waybar/wallust 2>/dev/null || true
-
-    # --- Wallust config (theme generator จาก wallpaper) ---
     ln -sf ~/.config/HyprV/wallust ~/.config/wallust 2>/dev/null || true
-
-    # --- Waybar style folder (เก็บ theme css ทั้งหมด) ---
     ln -sf ~/.config/HyprV/waybar/style ~/.config/waybar/style 2>/dev/null || true
 
     if [[ "$ISNVIDIA" == true ]]; then
@@ -336,7 +310,6 @@ if [[ $CFG =~ ^[Yy]$ ]]; then
         fi
     fi
 
-    # Dark Theme + SDDM
     echo -e "${NOTE} Setting up Dark Theme and SDDM..."
     sudo cp -R Extras/sdt /usr/share/sddm/themes/ 2>/dev/null || true
     sudo chown -R "$USER:$USER" /usr/share/sddm/themes/sdt 2>/dev/null || true
@@ -346,7 +319,6 @@ if [[ $CFG =~ ^[Yy]$ ]]; then
 
     cp -f ~/.config/HyprV/backgrounds/v4-background-dark.jpg /usr/share/sddm/themes/sdt/wallpaper.jpg 2>/dev/null || true
 
-    # gsettings/xfconf อาจไม่มีบน minimal — มี || true แล้ว
     xfconf-query -c xsettings -p /Net/ThemeName -s "Adwaita-dark" 2>/dev/null || true
     xfconf-query -c xsettings -p /Net/IconThemeName -s "Papirus-Dark" 2>/dev/null || true
     gsettings set org.gnome.desktop.interface gtk-theme "Adwaita-dark" 2>/dev/null || true
@@ -371,7 +343,6 @@ if [[ $SET_WALLPAPER =~ ^[Yy]$ ]]; then
 fi
 
 # ================== Default Browser ==================
-# [MINIMAL FIX #3] xdg-utils อยู่ใน install_stage แล้ว แต่ถ้าข้าม install stage ให้ check ก่อน
 echo -e "${NOTE} Choose default browser (1=Librewolf, 2=Firefox, 3=Brave):"
 read -rep $'[\e[1;33mACTION\e[0m] - Choice: ' BROWSER_CHOICE
 if command -v xdg-settings &>/dev/null; then
@@ -411,8 +382,6 @@ fi
 SERVICE="hyprpolkitagent"
 echo -e "${NOTE} Setting up $SERVICE..." | tee -a "$LOG"
 
-# [MINIMAL FIX #6] systemctl --user ต้องการ dbus/systemd user session
-# ถ้ายังไม่มี session (เช่น รันจาก TTY บน minimal) จะ fail — ตรวจสอบก่อน
 if ! systemctl --user status &>/dev/null; then
     echo -e "${WARN} systemd user session not available. $SERVICE will be enabled on next login." | tee -a "$LOG"
     systemctl --user enable "$SERVICE" >> "$LOG" 2>&1 || true
@@ -439,7 +408,7 @@ fi
 
 # ================== Final Verification ==================
 echo ""
-if $ISAUR -Q "$HYPR_PACKAGE" &>/dev/null; then
+if $AURHELPER -Q "$HYPR_PACKAGE" &>/dev/null; then
     echo -e "${OK} Installation completed successfully!"
     echo -e "${NOTE} Installed Hyprland version: $HYPR_PACKAGE"
     echo -e "${NOTE} Detected bootloader: $BOOTLOADER"
