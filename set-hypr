@@ -225,7 +225,7 @@ if [[ $INST =~ ^[Yy]$ ]]; then
 
     echo -e "${NOTE} === Starting package installation ===" | tee -a "$LOG"
 
-    if [[ "$MODE" == "batch" ]]; then
+if [[ "$MODE" == "batch" ]]; then
         # ====================== BATCH MODE (Fast) ======================
         ALL_PACKAGES=(
             "${prep_stage[@]}"
@@ -242,7 +242,7 @@ if [[ $INST =~ ^[Yy]$ ]]; then
         echo -e "${WARN} Starting batch installation of ${#ALL_PACKAGES[@]} packages..."
 
         $AURHELPER -S --noconfirm --needed --sudoloop "${ALL_PACKAGES[@]}" >> "$LOG" 2>&1 &
-        local batch_pid=$!
+        batch_pid=$!
 
         echo -ne "${NOTE} Installing all packages "
 
@@ -252,7 +252,7 @@ if [[ $INST =~ ^[Yy]$ ]]; then
         done
 
         wait "$batch_pid"
-        local exit_code=$?
+        exit_code=$?
         echo ""
 
         if [[ $exit_code -eq 0 ]]; then
@@ -263,6 +263,7 @@ if [[ $INST =~ ^[Yy]$ ]]; then
             tail -n 40 "$LOG"
             exit 1
         fi
+    fi
 
     else
         # ====================== SINGLE MODE (Stable) ======================
