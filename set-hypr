@@ -19,6 +19,16 @@ fi
 mkdir -p Install-Logs
 LOG="Install-Logs/install-$(date +%d-%H%M%S).log"
 
+# ================== Root Check ==================
+if [[ "$EUID" -eq 0 ]]; then
+    echo -e "${ERROR} Do not run this script as root! Run as normal user with sudo access."
+    exit 1
+fi
+if ! sudo -v; then
+    echo -e "${ERROR} This script requires sudo access. Please configure sudoers first."
+    exit 1
+fi
+
 # ================== Trap for cleanup on interrupt ==================
 trap 'echo -e "\n${ERROR} Script interrupted! Check $LOG for details."; exit 1' INT TERM ERR
 
