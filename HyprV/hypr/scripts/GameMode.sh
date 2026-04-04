@@ -4,6 +4,8 @@
 
 notif="$HOME/.config/HyprV/swaync/images/ja.png"
 SCRIPTSDIR="$HOME/.config/hypr/scripts"
+# shellcheck source=/dev/null
+. "$SCRIPTSDIR/WallpaperCmd.sh"
 HYPRGAMEMODE=$(hyprctl getoption animations:enabled | awk 'NR==1{print $2}')
 
 if [ "$HYPRGAMEMODE" = 1 ]; then
@@ -16,7 +18,7 @@ if [ "$HYPRGAMEMODE" = 1 ]; then
         keyword general:gaps_out 0;\
         keyword general:border_size 1;\
         keyword decoration:rounding 0"
-    swww kill 
+    "$WWW_CMD" kill 
     notify-send -e -u low -i "$notif" " Gamemode" " Enabled"
     exit
 else
@@ -29,7 +31,7 @@ else
         keyword general:gaps_out 10;\
         keyword general:border_size 2;\
         keyword decoration:rounding 5"
-    swww-daemon --format xrgb && swww img "$HOME/.config/rofi/.current_wallpaper" &
+    "$WWW_DAEMON" "${WWW_DAEMON_ARGS[@]}" && "$WWW_CMD" img "$HOME/.config/rofi/.current_wallpaper" &
     sleep 0.1
     ${SCRIPTSDIR}/WallustSwww.sh
     sleep 0.5

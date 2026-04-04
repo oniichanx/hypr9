@@ -25,7 +25,7 @@ notify_cmd_NOT="notify-send -u low -i ${iDoR}/note.png "
 notify_view() {
     if [[ "$1" == "active" ]]; then
         if [[ -e "${active_window_path}" ]]; then
-			"${sDIR}/Sounds.sh" --screenshot        
+			"${sDIR}/Sounds.sh" --screenshot >/dev/null 2>&1 &       
             resp=$(timeout 5 ${notify_cmd_shot_win} " Screenshot of:" " ${active_window_class} Saved.")
             case "$resp" in
 				action1)
@@ -37,11 +37,11 @@ notify_view() {
 			esac
         else
             ${notify_cmd_NOT} " Screenshot of:" " ${active_window_class} NOT Saved."
-            "${sDIR}/Sounds.sh" --error
+            "${sDIR}/Sounds.sh" --error >/dev/null 2>&1 &
         fi
 
     elif [[ "$1" == "swappy" ]]; then
-		"${sDIR}/Sounds.sh" --screenshot
+		"${sDIR}/Sounds.sh" --screenshot >/dev/null 2>&1 &
 		resp=$(${notify_cmd_shot} " Screenshot:" " Captured by Swappy")
 		case "$resp" in
 			action1)
@@ -55,7 +55,7 @@ notify_view() {
     else
         local check_file="${dir}/${file}"
         if [[ -e "$check_file" ]]; then
-            "${sDIR}/Sounds.sh" --screenshot
+            "${sDIR}/Sounds.sh" --screenshot >/dev/null 2>&1 &
             resp=$(timeout 5 ${notify_cmd_shot} " Screenshot" " Saved")
 			case "$resp" in
 				action1)
@@ -67,7 +67,7 @@ notify_view() {
 			esac
         else
             ${notify_cmd_NOT} " Screenshot" " NOT Saved"
-            "${sDIR}/Sounds.sh" --error
+            "${sDIR}/Sounds.sh" --error >/dev/null 2>&1 &
         fi
     fi
 }
@@ -83,14 +83,12 @@ countdown() {
 # take shots
 shotnow() {
 	cd ${dir} && grim - | tee "$file" | wl-copy
-	sleep 2
 	notify_view
 }
 
 shot5() {
 	countdown '5'
 	sleep 1 && cd ${dir} && grim - | tee "$file" | wl-copy
-	sleep 1
 	notify_view
 }
 
@@ -125,7 +123,6 @@ shotactive() {
     active_window_path="${dir}/${active_window_file}"
 
     hyprctl -j activewindow | jq -r '"\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])"' | grim -g - "${active_window_path}"
-	sleep 1
     notify_view "active"
 }
 
@@ -156,10 +153,10 @@ elif [[ "$1" == "--area" ]]; then
 	shotarea
 elif [[ "$1" == "--active" ]]; then
 	shotactive
-elif [[ "$1" == "--swappy" ]]; then
+elif [[ "$1" == "--swappy" || "$1" == "--swapp" || "$1" == "--swap" ]]; then
 	shotswappy
 else
-	echo -e "Available Options : --now --in5 --in10 --win --area --active --swappy"
+	echo -e "Available Options : --now --in5 --in10 --win --area --active --swappy (--swapp/--swap)"
 fi
 
 exit 0
