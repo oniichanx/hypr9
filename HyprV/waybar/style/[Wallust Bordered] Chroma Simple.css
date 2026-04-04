@@ -5,11 +5,19 @@
 
 
 * {
-	font-family: "JetBrainsMono Nerd Font";
-	font-weight: bold;
-	/* set font-size to 100% if font scaling is set to 1.00 using nwg-look */
-	font-size: 97%;
+    font-family: "JetBrainsMono Nerd Font";
+    font-weight: bold;
+    /* set font-size to 100% if font scaling is set to 1.00 using nwg-look */
+    font-size: 99%;
     min-height: 0;
+}
+
+/* Make group buttons themselves use readable text */
+#group-audio,
+#group-mobo_drawer {
+    background: @background;
+    color: @color15;
+    border: 2px solid @color13;
 }
 
 window#waybar {
@@ -27,12 +35,12 @@ window#waybar.empty #window {
 }
 
 tooltip {
-    background-color: @color12;
+    background-color: @background;
     color: @foreground;
     border-radius: 10px;
     border-width: 1.5px;
     border-style: solid;
-    border-color: @color9;
+    border-color: @color13;
     transition: 0.3s;
     opacity: 0.9;
 }
@@ -102,6 +110,8 @@ tooltip {
 #tray,
 #window,
 #wireplumber,
+#group-mobo_drawer,
+#group-audio,
 #custom-backlight,
 #custom-nightlight,
 #custom-browser,
@@ -149,6 +159,7 @@ tooltip {
     border: 2px solid @color13;
 }
 
+
 #cpu {
     border: 2px solid @color5;
     color: @foreground;
@@ -177,14 +188,14 @@ tooltip {
 }
 
 #custom-power {
-    color: red;
+    color: @color13;
     padding-left: 10px;
     padding-right: 2px;
-    border: 2px solid red;
+    border: 2px solid @color13;
 }
 
 #backlight {
-    color: #f9e2af;
+    color: @color14;
     padding-right: 5px;
 }
 
@@ -213,29 +224,35 @@ tooltip {
 }
 
 #clock {
-    color: #fab387;
+    color: @color13;
+}
+
+#clock:hover {
+    color: @color13;
+    background: @background;
+    border: 2px solid @color13;
 }
 
 
 #bluetooth {
-    color: #b4befe;
+    color: @color12;
     margin-right: 10px
 } 
 
 #pulseaudio.microphone,
 #pulseaudio {
     background-color: @color12;
-    color: #89b4fa;
+    color: @color15;
     border: 2px solid @color13;
 }
 
 #pulseaudio.muted {
-    color: #f38ba8;
+    color: @color13;
     padding-right: 20px;
 }
 
 #battery {
-    color: #a6e3a1;
+    color: @color10;
     margin-right: 5px;
     padding-right: 15px;
     border: 2px solid @color14;
@@ -249,22 +266,22 @@ tooltip {
 }
 
 #battery.good {
-    color: #ffd57a;
+    color: @color14;
     border: 2px solid @color15;
 }
 
 #battery.warning {
-    color: #fab387;
+    color: @color13;
     border-left: 0px;
     border: 2px solid @color12;
 }
 
 #battery.charging {
-    color: #a6e3a1;
+    color: @color10;
 }
 
 #battery.critical {
-    color: #f38ba8;
+    color: @color13;
     border-left: 0px;
     border: 2px solid @color8;
 }
@@ -287,7 +304,7 @@ tooltip {
 }
 
 #custom-weather {
-    color: #8eacf3;
+    color: @color12;
     border-right: 0px;
     margin-left: 0px;
     margin-right: 5px;
@@ -314,4 +331,30 @@ tooltip {
 #pulseaudio-slider highlight {
     min-height: 10px;
     border-radius: 5px;
+}
+
+/* Ensure group drawer modules match base style (avoid bright per-module colors) */
+#group-audio #pulseaudio,
+#group-audio #pulseaudio.microphone,
+#group-mobo_drawer #temperature,
+#group-mobo_drawer #cpu,
+#group-mobo_drawer #power-profiles-daemon,
+#group-mobo_drawer #memory,
+#group-mobo_drawer #disk {
+    background-color: @background;
+    color: @color15;
+    border: 2px solid @color13;
+}
+
+/* Global overrides for this style (match other widgets: dark bg + light text) */
+#pulseaudio,
+#pulseaudio.microphone,
+#cpu,
+#memory,
+#disk,
+#temperature,
+#power-profiles-daemon {
+    background-color: @background;
+    color: @color15;
+    border: 2px solid @color13;
 }

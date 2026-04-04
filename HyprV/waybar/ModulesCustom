@@ -11,10 +11,19 @@
 	"format-alt-click": "click",
 	"interval": 3600,
 	"return-type": "json",
-	"exec": "$HOME/.config/hypr/UserScripts/Weather.sh",
 	//"exec": "$HOME/.config/hypr/UserScripts/Weather.py",
-	"exec-if": "ping wttr.in -c1",
+	//"exec": "$HOME/.config/hypr/UserScripts/Weather.sh",
+	"exec": "$HOME/.config/hypr/UserScripts/WeatherWrap.sh",
+	//"exec-if": "ping wttr.in -c1",
 	"tooltip": true,
+},
+
+"custom/weather2": {
+    "exec": "waybar-weather",
+    "restart-interval": 60,
+    "return-type": "json",
+    "hide-empty-text": true,
+    "on-click": "pkill -USR1 waybar-weather"
 },
 
 "custom/hyprpicker": {
@@ -47,9 +56,9 @@
 
 "custom/settings": {
 	"format": " ",
-	"on-click": "$HOME/.config/hypr/UserScripts/QuickEdit.sh",
+	"on-click": "$HOME/.config/hypr/scripts/Kool_Quick_Settings.sh",
 	"tooltip": true,
-	"tooltip-format": "Launch Quick Edit",
+	"tooltip-format": "Launch KooL Hyprland Settings Menu",
 },
 
 "custom/cycle_wall": {
@@ -69,6 +78,17 @@
 	"tooltip-format": "Left Click: Quick Tips\nRight Click: Keybinds",
 },
 
+// External monitor brightness (ddcutil)
+"custom/brightness_external": {
+	"format": "{}",
+	"return-type": "json",
+	"interval": 2,
+	"exec": "$HOME/.config/hypr/scripts/ExternalBrightness.sh --get",
+	"on-scroll-up": "$HOME/.config/hypr/scripts/ExternalBrightness.sh --inc",
+	"on-scroll-down": "$HOME/.config/hypr/scripts/ExternalBrightness.sh --dec",
+	"tooltip": true
+},
+
 // Hypridle inhibitor
 "custom/hypridle": {
 	"format": "󱫗 ",
@@ -82,10 +102,10 @@
 },
 
 "custom/keyboard": {
-	"exec": "cat $HOME/.cache/kb_layout",
+	"exec": "$HOME/.config/hypr/scripts/KeyboardLayout.sh status",
 	"interval": 1,
 	"format": " {}",
-	"on-click": "$HOME/.config/hypr/scripts/SwitchKeyboardLayout.sh",
+	"on-click": "$HOME/.config/hypr/scripts/KeyboardLayout.sh switch",
 },
 
 "custom/light_dark": {
@@ -95,6 +115,19 @@
 	"on-click-middle": "$HOME/.config/hypr/UserScripts/WallpaperSelect.sh",
 	"tooltip": true,
 	"tooltip-format": "Left Click: Switch Dark-Light Themes\nMiddle Click: Wallpaper Menu\nRight Click: Waybar Styles Menu",
+},
+
+// Night light (Hyprsunset)
+"custom/nightlight": {
+	"return-type": "json",
+	"exec": "$HOME/.config/hypr/scripts/Hyprsunset.sh status",
+	"interval": 3,
+	"format": "{text}",
+	"min-length": 2,
+	"on-click": "$HOME/.config/hypr/scripts/Hyprsunset.sh toggle",
+	"tooltip": true,
+	"tooltip-format": "Night light toggle",
+	"escape": false
 },
 
 "custom/lock": {
@@ -178,14 +211,15 @@
 	"escape": true,
 },
 // NOTE:! This is mainly for Arch and Arch Based Distros  depend: pacman-contrib
+// Other Distro dont have notifications but can use to check for update for any other distro
 "custom/updater": {
 	"format": " {}",
 	"exec": "checkupdates | wc -l",
 	"exec-if": "[[ $(checkupdates | wc -l) ]]",
-	"interval": 15,
-	"on-click": "if command -v paru &> /dev/null; then kitty -T update paru -Syu; else kitty -T update yay -Syu; fi && notify-send 'The system has been updated'",
+	"interval": 43200, // (Arch Linux will try to check 12 hrs interval only
+	"on-click": "$HOME/.config/hypr/scripts/Distro_update.sh",
 	"tooltip": true,
-	"tooltip-format": "Left Click: Update System\nArch Linux Only",
+	"tooltip-format": "Left Click: Update System\nArch (w/ notification)\nFedora, OpenSuse, Debian/Ubuntu click to update",
 },
 // Separators
 "custom/separator#dot": {
