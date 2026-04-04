@@ -1,0 +1,473 @@
+#!/bin/bash
+set -euo pipefail
+
+# ================== Colors (safe fallback สำหรับ minimal) ==================
+if command -v tput &>/dev/null && tput setaf 1 &>/dev/null; then
+    OK="$(tput setaf 2)[OK]$(tput sgr0)"
+    ERROR="$(tput setaf 1)[ERROR]$(tput sgr0)"
+    NOTE="$(tput setaf 3)[NOTE]$(tput sgr0)"
+    INFO="$(tput setaf 4)[INFO]$(tput sgr0)"
+    WARN="$(tput setaf 1)[WARN]$(tput sgr0)"
+else
+    OK="[OK]"
+    ERROR="[ERROR]"
+    NOTE="[NOTE]"
+    INFO="[INFO]"
+    WARN="[WARN]"
+fi
+
+mkdir -p Install-Logs
+LOG="Install-Logs/install-$(date +%d-%H%M%S).log"
+
+# ================== Root Check ==================
+if [[ "$EUID" -eq 0 ]]; then
+    echo -e "${ERROR} Do not run this script as root! Run as normal user with sudo access."
+    exit 1
+fi
+if ! sudo -v; then
+    echo -e "${ERROR} This script requires sudo access. Please configure sudoers first."
+    exit 1
+fi
+
+# ================== Trap for cleanup on interrupt ==================
+trap 'echo -e "\n${ERROR} Script interrupted! Check $LOG for details."; exit 1' INT TERM ERR
+
+# ================== ติดตั้ง dependencies ขั้นต่ำก่อนเลย ==================
+echo -e "${NOTE} Ensuring base dependencies are installed..."
+sudo pacman -S --noconfirm --needed base-devel git pciutils >> "$LOG" 2>&1 || {
+    echo -e "${ERROR} Failed to install base dependencies. Check $LOG"
+    exit 1
+}
+
+# ================== VM Detection ==================
+ISVMWARE=false
+ISVBOX=false
+ISQEMU=false
+ISHYPERV=false
+ISVM=false
+
+if command -v systemd-detect-virt &>/dev/null; then
+    VIRT=$(systemd-detect-virt 2>/dev/null || true)
+    case "$VIRT" in
+        vmware)   ISVMWARE=true; ISVM=true ;;
+        oracle)   ISVBOX=true;   ISVM=true ;;
+        kvm|qemu) ISQEMU=true;   ISVM=true ;;
+        microsoft) ISHYPERV=true; ISVM=true ;;
+    esac
+fi
+
+if [[ "$ISVM" == true ]]; then
+    echo ""
+    echo -e "${WARN} ============================================================"
+    echo -e "${WARN}  Virtual Machine Detected: $VIRT"
+    echo -e "${WARN}  Please note that VMs are not fully supported."
+    echo -e "${WARN}  If you try to run this on a Virtual Machine there is a"
+    echo -e "${WARN}  high chance this will fail."
+    echo -e "${WARN} ============================================================"
+    echo ""
+    read -rep $'[\e[1;33mACTION\e[0m] - Continue anyway? (y/n): ' VMCONTINUE
+    if [[ ! $VMCONTINUE =~ ^[Yy]$ ]]; then
+        echo -e "${NOTE} Cancelled."
+        exit 0
+    fi
+fi
+
+# ================== เลือก AUR Helper ==================
+echo -e "${NOTE} Choose AUR Helper:"
+echo "1) Paru (recommended)"
+echo "2) Yay"
+read -rep $'[\e[1;33mACTION\e[0m] - Enter 1 or 2: ' AURCHOICE
+
+if [[ $AURCHOICE == "1" ]]; then
+    AURHELPER="paru"
+else
+    AURHELPER="yay"
+fi
+
+if ! command -v "$AURHELPER" &>/dev/null; then
+    echo -e "${NOTE} Installing $AURHELPER..."
+    ORIG_DIR="$(pwd)"
+    git clone "https://aur.archlinux.org/${AURHELPER}.git" || {
+        echo -e "${ERROR} Failed to clone $AURHELPER from AUR."
+        exit 1
+    }
+    cd "$AURHELPER" && makepkg -si --noconfirm && cd "$ORIG_DIR"
+    rm -rf "$AURHELPER"
+fi
+
+# ================== Progress Bar ==================
+show_progress() {
+    local pid=$1
+    local pkg=$2
+    echo -ne "${NOTE} Installing ${pkg} "
+    while kill -0 "$pid" 2>/dev/null; do
+        echo -n "."
+        sleep 1.5
+    done
+    wait "$pid"
+    return $?
+}
+
+install_software() {
+    if $AURHELPER -Q "$1" &>/dev/null; then
+        echo -e "${INFO} $1 already installed."
+    else
+        $AURHELPER -S --noconfirm --needed "$1" >> "$LOG" 2>&1 &
+        local pkg_pid=$!
+
+        if show_progress "$pkg_pid" "$1"; then
+            echo -e " ${OK} Successfully installed $1"
+        else
+            echo -e " ${ERROR} Failed to install $1. Check $LOG"
+            exit 1
+        fi
+    fi
+}
+
+echo -e "${NOTE} HyprV4 Installation Script - Updated 2026"
+
+prep_stage=(
+    qt5-wayland qt5ct qt6-wayland qt6ct qt5-svg qt5-quickcontrols2 qt5-graphicaleffects
+    gtk3 polkit polkit-gnome pipewire wireplumber jq wl-clipboard cliphist
+    python-requests python-pyquery pacman-contrib
+)
+
+nvidia_stage=(
+    linux-zen linux-zen-headers nvidia-open-dkms nvidia-settings
+    libva libva-nvidia-driver-git
+)
+
+install_stage=(
+    kitty swaync waybar swww hyprlock wallust yad bc rofi-wayland
+    imagemagick bibata-cursor-theme-bin wlogout
+    swappy grim slurp thunar btop firefox librewolf-bin thunderbird mpv
+    pamixer pavucontrol brightnessctl bluez bluez-utils blueman
+    network-manager-applet gvfs thunar-archive-plugin file-roller starship
+    papirus-icon-theme ttf-jetbrains-mono ttf-jetbrains-mono-nerd
+    ttf-droid ttf-fira-code noto-fonts-emoji adobe-source-code-pro-fonts
+    otf-font-awesome lxappearance xfce4-settings nwg-look sddm hyprpolkitagent
+    xdg-utils
+)
+
+clear
+
+# ================== เลือก Hyprland ==================
+echo -e "${NOTE} Select Hyprland version:"
+echo "1) hyprland-git (bleeding-edge)"
+echo "2) hyprland (stable)"
+read -rep $'[\e[1;33mACTION\e[0m] - Enter 1 or 2: ' HYPRCHOICE
+
+if [[ $HYPRCHOICE == "1" ]]; then
+    HYPR_PACKAGE="hyprland-git"
+    PORTAL_PACKAGE="xdg-desktop-portal-hyprland-git"
+else
+    HYPR_PACKAGE="hyprland"
+    PORTAL_PACKAGE="xdg-desktop-portal-hyprland"
+fi
+
+read -rep $'[\e[1;33mACTION\e[0m] - Continue with installation? (y/n): ' CONTINST
+if [[ ! $CONTINST =~ ^[Yy]$ ]]; then
+    echo -e "${NOTE} Cancelled."
+    exit 0
+fi
+
+# ================== Detect NVIDIA ==================
+if lspci -k | grep -A 2 -E "(VGA|3D)" | grep -iq nvidia; then
+    ISNVIDIA=true
+    echo -e "${NOTE} NVIDIA GPU detected."
+else
+    ISNVIDIA=false
+fi
+
+# ================== Detect Bootloader ==================
+detect_bootloader() {
+    if [[ -f /boot/grub/grub.cfg ]]; then
+        echo "grub"
+    elif [[ -d /boot/loader/entries ]]; then
+        echo "systemd-boot"
+    else
+        echo "unknown"
+    fi
+}
+BOOTLOADER=$(detect_bootloader)
+echo -e "${INFO} Detected bootloader: $BOOTLOADER" | tee -a "$LOG"
+
+# ================== WiFi powersave ==================
+read -rep $'[\e[1;33mACTION\e[0m] - Disable WiFi powersave? (y/n) ' WIFI
+if [[ $WIFI =~ ^[Yy]$ ]]; then
+    sudo mkdir -p /etc/NetworkManager/conf.d
+    echo -e "[connection]\nwifi.powersave = 2" | sudo tee /etc/NetworkManager/conf.d/wifi-powersave.conf >/dev/null
+    sudo systemctl restart NetworkManager
+    echo -e "${OK} WiFi powersave disabled."
+fi
+
+# ====================== Install Packages ======================
+read -rep $'[\e[1;33mACTION\e[0m] - Install all packages? (y/n) ' INST
+if [[ $INST =~ ^[Yy]$ ]]; then
+    echo -e "${NOTE} === Prep Stage ===" | tee -a "$LOG"
+    for SOFTWR in "${prep_stage[@]}"; do
+        install_software "$SOFTWR"
+    done
+
+    if [[ "$ISNVIDIA" == true ]]; then
+        echo -e "${NOTE} === NVIDIA Setup ===" | tee -a "$LOG"
+        for SOFTWR in "${nvidia_stage[@]}"; do
+            install_software "$SOFTWR"
+        done
+
+
+
+        if ! grep -q "nvidia" /etc/mkinitcpio.conf; then
+            # append nvidia modules เข้า MODULES=(...) แทนการ replace ทั้งบรรทัด
+            # ป้องกัน overwrite module เดิมที่อาจมีอยู่ เช่น btrfs, i915 ฯลฯ
+            if grep -q "^MODULES=" /etc/mkinitcpio.conf; then
+                sudo sed -i 's/^MODULES=(\(.*\))/MODULES=(\1 nvidia nvidia_modeset nvidia_uvm nvidia_drm)/' /etc/mkinitcpio.conf
+                echo -e "${OK} NVIDIA modules appended to mkinitcpio.conf"
+            else
+                echo -e "${WARN} MODULES= line not found in mkinitcpio.conf — edit manually: /etc/mkinitcpio.conf"
+            fi
+        else
+            echo -e "${INFO} NVIDIA modules already in mkinitcpio.conf, skipping."
+        fi
+
+        sudo mkinitcpio -P >> "$LOG" 2>&1 || {
+            echo -e "${WARN} mkinitcpio failed. Check $LOG"
+        }
+
+        echo "options nvidia-drm modeset=1" | sudo tee /etc/modprobe.d/nvidia.conf >/dev/null
+
+        if [[ "$BOOTLOADER" == "grub" ]]; then
+            if ! grep -q "nvidia_drm.modeset=1" /etc/default/grub; then
+                # ตรวจว่า pattern GRUB_CMDLINE_LINUX_DEFAULT=" มีจริงก่อน sed
+                if grep -q '^GRUB_CMDLINE_LINUX_DEFAULT="' /etc/default/grub; then
+                    sudo sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="nvidia_drm.modeset=1 /' /etc/default/grub
+                    echo -e "${OK} nvidia_drm.modeset=1 added to GRUB config"
+                else
+                    echo -e "${WARN} GRUB_CMDLINE_LINUX_DEFAULT pattern not found — edit manually: /etc/default/grub"
+                fi
+            else
+                echo -e "${INFO} nvidia_drm.modeset=1 already in GRUB config, skipping."
+            fi
+            sudo grub-mkconfig -o /boot/grub/grub.cfg >> "$LOG" 2>&1 || {
+                echo -e "${WARN} grub-mkconfig failed. Check $LOG"
+            }
+        elif [[ "$BOOTLOADER" == "systemd-boot" ]]; then
+            echo -e "${NOTE} systemd-boot detected. Adding nvidia_drm.modeset=1 to kernel options..."
+            for entry in /boot/loader/entries/*.conf; do
+                if grep -q "^options" "$entry" && ! grep -q "nvidia_drm.modeset=1" "$entry"; then
+                    sudo sed -i 's/^options /options nvidia_drm.modeset=1 /' "$entry"
+                    echo -e "${INFO} Updated: $entry"
+                fi
+            done
+        else
+            echo -e "${WARN} Unknown bootloader. Please add nvidia_drm.modeset=1 to kernel parameters manually."
+        fi
+    fi
+
+    echo -e "${NOTE} === Installing $HYPR_PACKAGE ===" | tee -a "$LOG"
+    install_software "$HYPR_PACKAGE"
+
+    echo -e "${NOTE} === Installing $PORTAL_PACKAGE ===" | tee -a "$LOG"
+    install_software "$PORTAL_PACKAGE"
+
+    echo -e "${NOTE} === Installing Main Packages ===" | tee -a "$LOG"
+    for SOFTWR in "${install_stage[@]}"; do
+        install_software "$SOFTWR"
+    done
+
+    echo -e "${NOTE} Removing conflicting xdg-desktop-portals..." | tee -a "$LOG"
+    for pkg in xdg-desktop-portal-gnome xdg-desktop-portal-gtk; do
+        if pacman -Q "$pkg" &>/dev/null; then
+            sudo pacman -R --noconfirm "$pkg" >> "$LOG" 2>&1
+            echo -e "${OK} Removed $pkg"
+        else
+            echo -e "${INFO} $pkg not installed, skipping."
+        fi
+    done
+
+    sudo systemctl enable --now bluetooth.service
+    sudo systemctl enable sddm
+fi
+
+# ====================== Copy Config Files + Dark Theme ======================
+read -rep $'[\e[1;33mACTION\e[0m] - Copy config files? (y/n) ' CFG
+if [[ $CFG =~ ^[Yy]$ ]]; then
+    echo -e "${NOTE} Copying config files..."
+
+    # ตรวจว่า HyprV มีอยู่จริงก่อน ถ้าไม่มีให้หยุดทันที ไม่งั้น symlink ทั้งหมดจะชี้ไปที่ว่าง
+    if [[ ! -d "HyprV" ]]; then
+        echo -e "${ERROR} HyprV folder not found in $(pwd)! Aborting config copy."
+        exit 1
+    fi
+
+    cp -R HyprV ~/.config/
+
+    for DIR in hypr kitty swaync swaylock waybar wlogout rofi; do
+        DIRPATH=~/.config/$DIR
+        if [ -d "$DIRPATH" ]; then
+            echo -e "${NOTE} Backing up $DIR..."
+            mv "$DIRPATH" "${DIRPATH}-backup" 2>/dev/null || true
+        fi
+        mkdir -p "$DIRPATH"
+    done
+
+    echo -e "${NOTE} Linking config files..."
+
+    # [hyprland] cp (ไม่ใช่ ln) เพราะ hyprland.conf ถูก append nvidia/rog ทีหลัง
+    cp -r ~/.config/HyprV/hypr/* ~/.config/hypr/ 2>/dev/null || true
+
+    # [rofi] cp — config.rasi + themes/ + launcher scripts
+    cp -r ~/.config/HyprV/rofi/* ~/.config/rofi/ 2>/dev/null || true
+
+    # [wallpaper] cp ไปไว้ ~/Pictures/ ให้ swww ใช้ตอน startup
+    cp -r ~/.config/HyprV/Pictures ~/ 2>/dev/null || true
+
+    # [kitty] ln: kitty.conf (live-update) / cp: themes (static)
+    ln -sf ~/.config/HyprV/kitty/kitty.conf ~/.config/kitty/kitty.conf 2>/dev/null || true
+    cp -r ~/.config/HyprV/kitty/kitty-themes/ ~/.config/kitty/kitty-themes 2>/dev/null || true
+
+    # [swaync] ln: config.json, style.css, icons/, images/ — restart: swaync -R && swaync
+    ln -sf ~/.config/HyprV/swaync/config.json ~/.config/swaync/config.json 2>/dev/null || true
+    ln -sf ~/.config/HyprV/swaync/style.css ~/.config/swaync/style.css 2>/dev/null || true
+    ln -sf ~/.config/HyprV/swaync/icons ~/.config/swaync 2>/dev/null || true
+    ln -sf ~/.config/HyprV/swaync/images ~/.config/swaync 2>/dev/null || true
+
+    # [waybar] layout + theme default — เปลี่ยนแค่ชี้ symlink ใหม่ไปที่ configs/ หรือ style/
+    ln -sf ~/.config/HyprV/waybar/configs/[TOP]\ Simple ~/.config/waybar/config 2>/dev/null || true
+    ln -sf ~/.config/HyprV/waybar/style/[Colored]\ Translucent.css ~/.config/waybar/style.css 2>/dev/null || true
+
+    # [wlogout] ln: layout, icons/, style.css — check: ls -la ~/.config/wlogout/
+    ln -sf ~/.config/HyprV/wlogout/layout ~/.config/wlogout/layout 2>/dev/null || true
+    ln -sf ~/.config/HyprV/wlogout/icons ~/.config/wlogout/icons 2>/dev/null || true
+    ln -sf ~/.config/HyprV/wlogout/style.css ~/.config/wlogout/style.css 2>/dev/null || true
+
+    # [waybar modules] ln: Modules, Custom, Groups, Workspaces, Vertical — reload: killall waybar && waybar &
+    ln -sf ~/.config/HyprV/waybar/Modules ~/.config/waybar/Modules 2>/dev/null || true
+    ln -sf ~/.config/HyprV/waybar/ModulesCustom ~/.config/waybar/ModulesCustom 2>/dev/null || true
+    ln -sf ~/.config/HyprV/waybar/ModulesGroups ~/.config/waybar/ModulesGroups 2>/dev/null || true
+    ln -sf ~/.config/HyprV/waybar/ModulesWorkspaces ~/.config/waybar/ModulesWorkspaces 2>/dev/null || true
+    ln -sf ~/.config/HyprV/waybar/ModulesVertical ~/.config/waybar/ModulesVertical 2>/dev/null || true
+
+    # [wallust] ln: waybar/wallust (color template) + ~/.config/wallust (config หลัก) — fix: wallust run ~/Pictures/<img>
+    ln -sf ~/.config/HyprV/waybar/wallust ~/.config/waybar/wallust 2>/dev/null || true
+    ln -sf ~/.config/HyprV/wallust ~/.config/wallust 2>/dev/null || true
+
+    # [waybar style folder] ln: style/ ทั้งโฟลเดอร์ — ต้องมีก่อนเพราะ style.css ชี้ไฟล์ข้างใน
+    ln -sf ~/.config/HyprV/waybar/style ~/.config/waybar/style 2>/dev/null || true
+
+    if [[ "$ISNVIDIA" == true ]]; then
+        if ! grep -q "env_var_nvidia.conf" ~/.config/hypr/hyprland.conf 2>/dev/null; then
+            echo -e "\nsource = ~/.config/hypr/env_var_nvidia.conf" >> ~/.config/hypr/hyprland.conf
+        fi
+    fi
+
+    echo -e "${NOTE} Setting up Dark Theme and SDDM..."
+    sudo cp -R Extras/sdt /usr/share/sddm/themes/ 2>/dev/null || true
+    sudo chown -R "$USER:$USER" /usr/share/sddm/themes/sdt 2>/dev/null || true
+    sudo mkdir -p /etc/sddm.conf.d
+    echo -e "[Theme]\nCurrent=sdt" | sudo tee /etc/sddm.conf.d/10-theme.conf >/dev/null
+    sudo cp Extras/hyprland.desktop /usr/share/wayland-sessions/ 2>/dev/null || true
+
+    cp -f ~/.config/HyprV/backgrounds/v4-background-dark.jpg /usr/share/sddm/themes/sdt/wallpaper.jpg 2>/dev/null || true
+
+    xfconf-query -c xsettings -p /Net/ThemeName -s "Adwaita-dark" 2>/dev/null || true
+    xfconf-query -c xsettings -p /Net/IconThemeName -s "Papirus-Dark" 2>/dev/null || true
+    gsettings set org.gnome.desktop.interface gtk-theme "Adwaita-dark" 2>/dev/null || true
+    gsettings set org.gnome.desktop.interface icon-theme "Papirus-Dark" 2>/dev/null || true
+
+    echo -e "${OK} Dark theme and SDDM setup completed."
+fi
+
+# ================== Starship ==================
+read -rep $'[\e[1;33mACTION\e[0m] - Enable Starship shell? (y/n) ' STAR
+if [[ $STAR =~ ^[Yy]$ ]]; then
+    if ! grep -q 'starship init bash' ~/.bashrc 2>/dev/null; then
+        echo 'eval "$(starship init bash)"' >> ~/.bashrc
+    fi
+    cp Extras/starship.toml ~/.config/ 2>/dev/null || true
+fi
+
+# ================== Wallpaper ==================
+read -rep $'[\e[1;33mACTION\e[0m] - Enable wallpaper on startup? (y/n) ' SET_WALLPAPER
+if [[ $SET_WALLPAPER =~ ^[Yy]$ ]]; then
+    sed -i 's|#exec-once = ~/.config/hypr/startup.sh|exec-once = ~/.config/hypr/startup.sh|' ~/.config/hypr/hyprland.conf 2>/dev/null || true
+fi
+
+# ================== Default Browser ==================
+echo -e "${NOTE} Choose default browser (1=Librewolf, 2=Firefox, 3=Brave):"
+read -rep $'[\e[1;33mACTION\e[0m] - Choice: ' BROWSER_CHOICE
+if command -v xdg-settings &>/dev/null; then
+    case $BROWSER_CHOICE in
+        1) xdg-settings set default-web-browser librewolf.desktop ;;
+        2) xdg-settings set default-web-browser firefox.desktop ;;
+        3) xdg-settings set default-web-browser brave.desktop ;;
+        *) xdg-settings set default-web-browser firefox.desktop ;;
+    esac
+else
+    echo -e "${WARN} xdg-settings not found. Set default browser manually after reboot."
+fi
+
+# ================== ASUS ROG ==================
+read -rep $'[\e[1;33mACTION\e[0m] - Install ASUS ROG support? (y/n) ' ROG
+if [[ $ROG =~ ^[Yy]$ ]]; then
+    echo -e "${NOTE} Setting up ASUS ROG support..." | tee -a "$LOG"
+    sudo pacman-key --recv-keys 8F654886F17D497FEFE3DB448B15A6B0E9A3FA35 &>>"$LOG"
+    sudo pacman-key --lsign-key 8F654886F17D497FEFE3DB448B15A6B0E9A3FA35 &>>"$LOG"
+
+    if ! grep -q "\[g14\]" /etc/pacman.conf; then
+        echo -e "\n[g14]\nServer = https://arch.asus-linux.org" | sudo tee -a /etc/pacman.conf &>>"$LOG"
+    fi
+
+    sudo pacman -Suy --noconfirm &>>"$LOG"
+    install_software asusctl
+    install_software supergfxctl
+    install_software rog-control-center
+    sudo systemctl enable --now power-profiles-daemon.service supergfxd
+
+    if ! grep -q "rog-g15-strix-2021-binds.conf" ~/.config/hypr/hyprland.conf 2>/dev/null; then
+        echo -e "\nsource = ~/.config/hypr/rog-g15-strix-2021-binds.conf" >> ~/.config/hypr/hyprland.conf
+    fi
+fi
+
+# ================== hyprpolkitagent ==================
+SERVICE="hyprpolkitagent"
+echo -e "${NOTE} Setting up $SERVICE..." | tee -a "$LOG"
+
+if ! systemctl --user status &>/dev/null; then
+    echo -e "${WARN} systemd user session not available. $SERVICE will be enabled on next login." | tee -a "$LOG"
+    systemctl --user enable "$SERVICE" >> "$LOG" 2>&1 || true
+elif systemctl --user list-unit-files 2>/dev/null | grep -q "^${SERVICE}\.service"; then
+
+    echo -e "${NOTE} Stopping other polkit agents to prevent conflict..." | tee -a "$LOG"
+    pkill -u "$UID" -f 'polkit-gnome-authentication-agent-1|xfce-polkit|polkit-kde-authentication-agent-1' 2>/dev/null || true
+
+    rm -rf "$HOME/.config/systemd/user/${SERVICE}.service.d" 2>/dev/null || true
+
+    systemctl --user daemon-reload >> "$LOG" 2>&1 || true
+    systemctl --user enable --now "$SERVICE" >> "$LOG" 2>&1 || true
+
+    sleep 1.5
+
+    if systemctl --user is-active --quiet "$SERVICE"; then
+        echo -e "${OK} $SERVICE is running successfully." | tee -a "$LOG"
+    else
+        echo -e "${WARN} $SERVICE is not active. You may need to restart it manually after reboot." | tee -a "$LOG"
+    fi
+else
+    echo -e "${WARN} $SERVICE.service not found. Skipping..." | tee -a "$LOG"
+fi
+
+# ================== Final Verification ==================
+echo ""
+if $AURHELPER -Q "$HYPR_PACKAGE" &>/dev/null; then
+    echo -e "${OK} Installation completed successfully!"
+    echo -e "${NOTE} Installed Hyprland version: $HYPR_PACKAGE"
+    echo -e "${NOTE} Detected bootloader: $BOOTLOADER"
+else
+    echo -e "${WARN} Installation finished but $HYPR_PACKAGE may not be installed correctly. Check $LOG"
+fi
+
+read -rep $'[\e[1;33mACTION\e[0m] - Reboot now? (y/n) ' REBOOT
+if [[ $REBOOT =~ ^[Yy]$ ]]; then
+    sudo reboot
+fi

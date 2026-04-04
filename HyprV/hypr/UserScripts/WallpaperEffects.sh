@@ -9,6 +9,11 @@ wallpaper_output="$HOME/.config/hypr/wallpaper_effects/.wallpaper_modified"
 SCRIPTSDIR="$HOME/.config/hypr/scripts"
 focused_monitor=$(hyprctl monitors | awk '/^Monitor/{name=$2} /focused: yes/{print name}')
 rofi_theme="$HOME/.config/rofi/config-wallpaper-effect.rasi"
+if command -v awww >/dev/null 2>&1; then
+    WWW="awww"
+else
+    WWW="swww"
+fi
 
 # Directory for swaync
 iDIR="$HOME/.config/HyprV/swaync/images"
@@ -19,7 +24,11 @@ FPS=60
 TYPE="wipe"
 DURATION=2
 BEZIER=".43,1.19,1,.4"
-SWWW_PARAMS="--transition-fps $FPS --transition-type $TYPE --transition-duration $DURATION --transition-bezier $BEZIER"
+if [[ "$WWW" == "swww" ]]; then
+    SWWW_PARAMS="--transition-fps $FPS --transition-type $TYPE --transition-duration $DURATION --transition-bezier $BEZIER"
+else
+    SWWW_PARAMS=""
+fi
 
 # Define ImageMagick effects
 declare -A effects=(
@@ -45,7 +54,7 @@ declare -A effects=(
 
 # Function to apply no effects
 no-effects() {
-    swww img -o "$focused_monitor" "$wallpaper_current" $SWWW_PARAMS &&
+    $WWW img -o "$focused_monitor" "$wallpaper_current" $SWWW_PARAMS &&
     wait $!
     wallust run "$wallpaper_current" -s &&
     wait $!
@@ -83,7 +92,7 @@ main() {
             done
 
             sleep 1
-            swww img -o "$focused_monitor" "$wallpaper_output" $SWWW_PARAMS &
+            $WWW img -o "$focused_monitor" "$wallpaper_output" $SWWW_PARAMS &
 
             sleep 2
   
