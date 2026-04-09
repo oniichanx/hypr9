@@ -16,12 +16,12 @@ wallpaper_link="$HOME/.config/rofi/.current_wallpaper"
 iDIR="$HOME/.config/swaync/images"
 iDIRi="$HOME/.config/swaync/icons"
 
-# swww transition config
+# swww/awww transition config
 FPS=60
 TYPE="any"
 DURATION=2
 BEZIER=".43,1.19,1,.4"
-if [[ "$WWW_CMD" == "awww" ]]; then
+if [[ "$WWW_CMD" == "swww" || "$WWW_CMD" == "awww" ]]; then
   SWWW_PARAMS="--transition-fps $FPS --transition-type $TYPE --transition-duration $DURATION --transition-bezier $BEZIER"
 else
   SWWW_PARAMS=""
@@ -36,6 +36,9 @@ fi
 # Variables
 rofi_theme="$HOME/.config/rofi/config-wallpaper.rasi"
 focused_monitor=$(hyprctl monitors -j | jq -r '.[] | select(.focused) | .name')
+
+per_monitor_wallpaper_current="$HOME/.config/hypr/wallpaper_effects/.wallpaper_current_${focused_monitor}"
+per_monitor_wallpaper_link="$HOME/.config/rofi/.current_wallpaper_${focused_monitor}"
 
 # Ensure focused_monitor is detected
 if [[ -z "$focused_monitor" ]]; then
@@ -170,6 +173,11 @@ apply_image_wallpaper() {
   }
   "$WWW_CMD" img -o "$focused_monitor" "$image_path" $SWWW_PARAMS
 
+  # Persist per-monitor wallpaper selection
+  mkdir -p "$(dirname "$per_monitor_wallpaper_current")" "$(dirname "$per_monitor_wallpaper_link")"
+  ln -sf "$image_path" "$per_monitor_wallpaper_link" || true
+  cp -f "$image_path" "$per_monitor_wallpaper_current" || true
+
   # Run additional scripts (pass the image path to avoid cache race conditions)
   "$SCRIPTSDIR/WallustSwww.sh" "$image_path"
   sleep 2
@@ -223,7 +231,7 @@ main() {
     # Search for the selected file in the wallpapers directory, including subdirectories
     selected_file=$(find "$wallDIR" -iname "$choice_basename.*" -print -quit)
   fi
-  
+
   if [[ -z "$selected_file" ]]; then
     echo "File not found. Selected choice: $choice"
     exit 1

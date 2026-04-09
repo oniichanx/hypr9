@@ -7,7 +7,7 @@ terminal=kitty
 wallpaper_current="$HOME/.config/hypr/wallpaper_effects/.wallpaper_current"
 wallpaper_output="$HOME/.config/hypr/wallpaper_effects/.wallpaper_modified"
 SCRIPTSDIR="$HOME/.config/hypr/scripts"
-focused_monitor=$(hyprctl monitors | awk '/^Monitor/{name=$2} /focused: yes/{print name}')
+focused_monitor=$(hyprctl monitors -j | jq -r '.[] | select(.focused) | .name')
 rofi_theme="$HOME/.config/rofi/config-wallpaper-effect.rasi"
 if command -v awww >/dev/null 2>&1; then
     WWW="awww"
@@ -19,12 +19,12 @@ fi
 iDIR="$HOME/.config/HyprV/swaync/images"
 iDIRi="$HOME/.config/swaync/icons"
 
-# swww transition config
+# swww/awww transition config
 FPS=60
 TYPE="wipe"
 DURATION=2
 BEZIER=".43,1.19,1,.4"
-if [[ "$WWW" == "swww" ]]; then
+if [[ "$WWW" == "swww" || "$WWW" == "awww" ]]; then
     SWWW_PARAMS="--transition-fps $FPS --transition-type $TYPE --transition-duration $DURATION --transition-bezier $BEZIER"
 else
     SWWW_PARAMS=""
