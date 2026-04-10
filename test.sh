@@ -29,10 +29,10 @@ if ! sudo -v; then
     exit 1
 fi
 
-# ================== Trap for cleanup on interrupt ==================
+# ================== Trap ==================
 trap 'echo -e "\n${ERROR} Script interrupted! Check $LOG for details."; exit 1' INT TERM ERR
 
-echo -e "${NOTE} HyprV4 Ultra-Fast Installation Script - Updated 2026" | tee -a "$LOG"
+echo -e "${NOTE} HyprV4 Ultra-Fast Installation Script (AUR Helper Only) - 2026" | tee -a "$LOG"
 
 # ================== Base dependencies ==================
 echo -e "${NOTE} Ensuring base dependencies are installed..." | tee -a "$LOG"
@@ -64,7 +64,7 @@ if [[ "$ISVM" == true ]]; then
     fi
 fi
 
-# ================== Choose AUR Helper (Fast binary version) ==================
+# ================== Choose AUR Helper ==================
 echo -e "${NOTE} Choose AUR Helper:"
 echo "1) Paru (recommended)"
 echo "2) Yay"
@@ -72,24 +72,21 @@ read -rep $'[\e[1;33mACTION\e[0m] - Enter 1 or 2: ' AURCHOICE
 
 if [[ $AURCHOICE == "1" ]]; then
     AURHELPER="paru"
-    AURBIN="paru-bin"
+    echo -e "${NOTE} Installing/Rebuilding paru from source..." | tee -a "$LOG"
+    git clone https://aur.archlinux.org/paru.git --depth=1
+    cd paru && makepkg -si --noconfirm && cd .. && rm -rf paru
 else
     AURHELPER="yay"
-    AURBIN="yay-bin"
+    echo -e "${NOTE} Installing/Rebuilding yay from source..." | tee -a "$LOG"
+    git clone https://aur.archlinux.org/yay.git --depth=1
+    cd yay && makepkg -si --noconfirm && cd .. && rm -rf yay
 fi
 
-if ! command -v "$AURHELPER" &>/dev/null; then
-    echo -e "${NOTE} Installing $AURBIN (fast)..." | tee -a "$LOG"
-    git clone https://aur.archlinux.org/"$AURBIN".git --depth=1
-    cd "$AURBIN" && makepkg -si --noconfirm && cd .. && rm -rf "$AURBIN"
-fi
-
-# Optimize makepkg for speed (parallel + no compression)
-echo -e "${NOTE} Optimizing makepkg for faster builds..." | tee -a "$LOG"
+# Optimize makepkg
 sudo sed -i "s/^MAKEFLAGS=.*/MAKEFLAGS=\"-j$(nproc)\"/" /etc/makepkg.conf 2>/dev/null || true
 sudo sed -i 's/^PKGEXT=.*/PKGEXT='\''.pkg.tar'\''/' /etc/makepkg.conf 2>/dev/null || true
 
-# ================== Hyprland Version ==================
+# ================== Hyprland version ==================
 echo -e "${NOTE} Select Hyprland version:"
 echo "1) hyprland-git (bleeding-edge)"
 echo "2) hyprland (stable)"
@@ -109,13 +106,14 @@ if [[ ! $CONTINST =~ ^[Yy]$ ]]; then
     exit 0
 fi
 
-# ================== Detect NVIDIA & Bootloader ==================
+# ================== Detect NVIDIA ==================
 ISNVIDIA=false
 if lspci -k | grep -A 2 -E "(VGA|3D)" | grep -iq nvidia; then
     ISNVIDIA=true
     echo -e "${NOTE} NVIDIA GPU detected."
 fi
 
+# ================== Detect Bootloader ==================
 detect_bootloader() {
     if [[ -f /boot/grub/grub.cfg ]]; then
         echo "grub"
@@ -137,7 +135,7 @@ if [[ $WIFI =~ ^[Yy]$ ]]; then
     echo -e "${OK} WiFi powersave disabled."
 fi
 
-# ================== Package Lists (เหมือนเดิมทุกตัว) ==================
+# ================== Package Lists ==================
 prep_stage=(
     qt5-wayland qt5ct qt6-wayland qt6ct qt5-svg qt5-quickcontrols2 qt5-graphicaleffects
     gtk3 polkit polkit-gnome pipewire wireplumber jq wl-clipboard cliphist
@@ -161,78 +159,54 @@ install_stage=(
     xdg-utils
 )
 
-# ================== Fast Batch Install (แทน install_software ทีละตัว) ==================
+# ================== Install ALL with AUR Helper only ==================
 read -rep $'[\e[1;33mACTION\e[0m] - Install all packages? (y/n) ' INST
 if [[ $INST =~ ^[Yy]$ ]]; then
-    echo -e "${NOTE} === Starting Ultra-Fast Batch Installation ===" | tee -a "$LOG"
+    echo -e "${NOTE} === Starting Batch Installation with $AURHELPER ===" | tee -a "$LOG"
 
-    ALL_PACKAGES=("${prep_stage[@]}")
-    [[ "$ISNVIDIA" == true ]] && ALL_PACKAGES+=("${nvidia_stage[@]}")
-    ALL_PACKAGES+=("$HYPR_PACKAGE" "$PORTAL_PACKAGE" "${install_stage[@]}")
+    ALL_PKGS=("${prep_stage[@]}")
+    [[ "$ISNVIDIA" == true ]] && ALL_PKGS+=("${nvidia_stage[@]}")
+    ALL_PKGS+=("$HYPR_PACKAGE" "$PORTAL_PACKAGE" "${install_stage[@]}")
 
-    # Official repos + AUR ใน batch
-    echo -e "${NOTE} Installing all packages in one batch..." | tee -a "$LOG"
-    sudo pacman -S --noconfirm --needed "${ALL_PACKAGES[@]}" 2>&1 | tee -a "$LOG" || true
+    $AURHELPER -S --noconfirm --skipreview --bottomup --needed "${ALL_PKGS[@]}" 2>&1 | tee -a "$LOG" || {
+        echo -e "${WARN} Some packages may have failed. Check $LOG"
+    }
 
-    # AUR เฉพาะที่เหลือ
-    echo -e "${NOTE} Installing remaining AUR packages (fast mode)..." | tee -a "$LOG"
-    if [[ "$AURHELPER" == "paru" ]]; then
-        paru -S --noconfirm --skipreview --bottomup --needed bibata-cursor-theme-bin librewolf-bin 2>&1 | tee -a "$LOG"
-    else
-        yay -S --noconfirm --needed bibata-cursor-theme-bin librewolf-bin 2>&1 | tee -a "$LOG"
-    fi
-
-    # NVIDIA Setup (เหมือนเดิมทุกบรรทัด)
+    # NVIDIA Setup
     if [[ "$ISNVIDIA" == true ]]; then
         echo -e "${NOTE} === NVIDIA Setup ===" | tee -a "$LOG"
-
         if ! grep -q "nvidia" /etc/mkinitcpio.conf; then
             if grep -q "^MODULES=" /etc/mkinitcpio.conf; then
                 sudo sed -i 's/^MODULES=(\(.*\))/MODULES=(\1 nvidia nvidia_modeset nvidia_uvm nvidia_drm)/' /etc/mkinitcpio.conf
-                echo -e "${OK} NVIDIA modules appended to mkinitcpio.conf"
+                echo -e "${OK} NVIDIA modules appended."
             else
-                echo -e "${WARN} MODULES= line not found — edit manually."
+                echo -e "${WARN} MODULES= line not found."
             fi
         fi
-
-        sudo mkinitcpio -P >> "$LOG" 2>&1 || echo -e "${WARN} mkinitcpio failed. Check $LOG"
+        sudo mkinitcpio -P >> "$LOG" 2>&1 || echo -e "${WARN} mkinitcpio failed."
 
         echo "options nvidia-drm modeset=1" | sudo tee /etc/modprobe.d/nvidia.conf >/dev/null
 
         if [[ "$BOOTLOADER" == "grub" ]]; then
-            if ! grep -q "nvidia_drm.modeset=1" /etc/default/grub; then
-                if grep -q '^GRUB_CMDLINE_LINUX_DEFAULT="' /etc/default/grub; then
-                    sudo sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="nvidia_drm.modeset=1 /' /etc/default/grub
-                    echo -e "${OK} nvidia_drm.modeset=1 added to GRUB"
-                else
-                    echo -e "${WARN} GRUB pattern not found — edit manually."
-                fi
+            if grep -q '^GRUB_CMDLINE_LINUX_DEFAULT="' /etc/default/grub; then
+                sudo sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="nvidia_drm.modeset=1 /' /etc/default/grub
+                sudo grub-mkconfig -o /boot/grub/grub.cfg >> "$LOG" 2>&1
             fi
-            sudo grub-mkconfig -o /boot/grub/grub.cfg >> "$LOG" 2>&1 || echo -e "${WARN} grub-mkconfig failed."
         elif [[ "$BOOTLOADER" == "systemd-boot" ]]; then
             for entry in /boot/loader/entries/*.conf; do
-                if grep -q "^options" "$entry" && ! grep -q "nvidia_drm.modeset=1" "$entry"; then
-                    sudo sed -i 's/^options /options nvidia_drm.modeset=1 /' "$entry"
-                fi
+                sudo sed -i 's/^options /options nvidia_drm.modeset=1 /' "$entry" 2>/dev/null || true
             done
-        else
-            echo -e "${WARN} Unknown bootloader. Add nvidia_drm.modeset=1 manually."
         fi
     fi
 
     echo -e "${NOTE} Removing conflicting xdg-desktop-portals..." | tee -a "$LOG"
-    for pkg in xdg-desktop-portal-gnome xdg-desktop-portal-gtk; do
-        if pacman -Q "$pkg" &>/dev/null; then
-            sudo pacman -R --noconfirm "$pkg" >> "$LOG" 2>&1
-            echo -e "${OK} Removed $pkg"
-        fi
-    done
+    sudo pacman -R --noconfirm xdg-desktop-portal-gnome xdg-desktop-portal-gtk 2>/dev/null || true
 
     sudo systemctl enable --now bluetooth.service
     sudo systemctl enable sddm
 fi
 
-# ====================== Copy Config Files + Dark Theme (เหมือนเดิมทุกบรรทัด) ======================
+# ====================== Copy Config Files + Dark Theme ======================
 read -rep $'[\e[1;33mACTION\e[0m] - Copy config files? (y/n) ' CFG
 if [[ $CFG =~ ^[Yy]$ ]]; then
     echo -e "${NOTE} Copying config files..."
@@ -307,7 +281,7 @@ if [[ $CFG =~ ^[Yy]$ ]]; then
     echo -e "${OK} Dark theme and SDDM setup completed."
 fi
 
-# ================== Starship (เหมือนเดิม) ==================
+# ================== Starship ==================
 read -rep $'[\e[1;33mACTION\e[0m] - Enable Starship shell? (y/n) ' STAR
 if [[ $STAR =~ ^[Yy]$ ]]; then
     if ! grep -q 'starship init bash' ~/.bashrc 2>/dev/null; then
@@ -333,10 +307,10 @@ if command -v xdg-settings &>/dev/null; then
         *) xdg-settings set default-web-browser firefox.desktop ;;
     esac
 else
-    echo -e "${WARN} xdg-settings not found. Set manually after reboot."
+    echo -e "${WARN} xdg-settings not found. Set default browser manually after reboot."
 fi
 
-# ================== ASUS ROG (เหมือนเดิมทุกบรรทัด) ==================
+# ================== ASUS ROG ==================
 read -rep $'[\e[1;33mACTION\e[0m] - Install ASUS ROG support? (y/n) ' ROG
 if [[ $ROG =~ ^[Yy]$ ]]; then
     echo -e "${NOTE} Setting up ASUS ROG support..." | tee -a "$LOG"
@@ -348,7 +322,7 @@ if [[ $ROG =~ ^[Yy]$ ]]; then
     fi
 
     sudo pacman -Suy --noconfirm &>>"$LOG"
-    "$AURHELPER" -S --noconfirm --needed asusctl supergfxctl rog-control-center 2>&1 | tee -a "$LOG"
+    $AURHELPER -S --noconfirm --needed asusctl supergfxctl rog-control-center 2>&1 | tee -a "$LOG"
     sudo systemctl enable --now power-profiles-daemon.service supergfxd
 
     if ! grep -q "rog-g15-strix-2021-binds.conf" ~/.config/hypr/hyprland.conf 2>/dev/null; then
@@ -356,7 +330,7 @@ if [[ $ROG =~ ^[Yy]$ ]]; then
     fi
 fi
 
-# ================== hyprpolkitagent (เหมือนเดิมทุกบรรทัด) ==================
+# ================== hyprpolkitagent ==================
 SERVICE="hyprpolkitagent"
 echo -e "${NOTE} Setting up $SERVICE..." | tee -a "$LOG"
 
@@ -364,7 +338,7 @@ if ! systemctl --user status &>/dev/null; then
     echo -e "${WARN} systemd user session not available. $SERVICE will be enabled on next login." | tee -a "$LOG"
     systemctl --user enable "$SERVICE" >> "$LOG" 2>&1 || true
 elif systemctl --user list-unit-files 2>/dev/null | grep -q "^${SERVICE}\.service"; then
-    echo -e "${NOTE} Stopping other polkit agents..." | tee -a "$LOG"
+    echo -e "${NOTE} Stopping other polkit agents to prevent conflict..." | tee -a "$LOG"
     pkill -u "$UID" -f 'polkit-gnome-authentication-agent-1|xfce-polkit|polkit-kde-authentication-agent-1' 2>/dev/null || true
 
     rm -rf "$HOME/.config/systemd/user/${SERVICE}.service.d" 2>/dev/null || true
@@ -377,7 +351,7 @@ elif systemctl --user list-unit-files 2>/dev/null | grep -q "^${SERVICE}\.servic
     if systemctl --user is-active --quiet "$SERVICE"; then
         echo -e "${OK} $SERVICE is running successfully." | tee -a "$LOG"
     else
-        echo -e "${WARN} $SERVICE is not active. Restart manually after reboot." | tee -a "$LOG"
+        echo -e "${WARN} $SERVICE is not active. You may need to restart it manually after reboot." | tee -a "$LOG"
     fi
 else
     echo -e "${WARN} $SERVICE.service not found. Skipping..." | tee -a "$LOG"
