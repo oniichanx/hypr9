@@ -5,12 +5,170 @@
 # Define preferred text editor and terminal
 edit=${EDITOR:-nano}
 tty=kitty
+config_file="$HOME/.config/hypr/UserConfigs/Default-Apps.conf"
 
 # Paths to configuration directories
 configs="$HOME/.config/hypr/configs"
 UserConfigs="$HOME/.config/hypr/UserConfigs"
 UserSettings="$HOME/.config/hypr"
 scriptsDir="$HOME/.config/hypr/scripts"
+
+rofi_theme="$HOME/.config/rofi/config-edit.rasi"
+msg=' ⁉️ Choose what to do ⁉️'
+iDIR="$HOME/.config/swaync/images"
+UserScripts="$HOME/.config/hypr/UserScripts"
+
+# Function to show info notification
+show_info() {
+    if [[ -f "$iDIR/info.png" ]]; then
+        notify-send -i "$iDIR/info.png" "Info" "$1"
+    else
+        notify-send "Info" "$1"
+    fi
+}
+# Function to toggle Rainbow Borders script availability and refresh UI components
+toggle_rainbow_borders() {
+    local rainbow_script="$UserScripts/RainbowBorders.sh"
+    local disabled_sh_bak="${rainbow_script}.bak"           # RainbowBorders.sh.bak
+    local disabled_bak_sh="$UserScripts/RainbowBorders.bak.sh" # RainbowBorders.bak.sh (created by copy.sh when disabled)
+    local refresh_script="$scriptsDir/Refresh.sh"
+    local status=""
+
+    # If both disabled variants exist, keep the newer one to avoid ambiguity
+    if [[ -f "$disabled_sh_bak" && -f "$disabled_bak_sh" ]]; then
+        if [[ "$disabled_sh_bak" -nt "$disabled_bak_sh" ]]; then
+            rm -f "$disabled_bak_sh"
+        else
+            rm -f "$disabled_sh_bak"
+        fi
+    fi
+
+    if [[ -f "$rainbow_script" ]]; then
+        # Currently enabled -> disable to canonical .sh.bak
+        if mv "$rainbow_script" "$disabled_sh_bak"; then
+            status="disabled"
+            if command -v hyprctl &>/dev/null; then
+                hyprctl reload >/dev/null 2>&1 || true
+            fi
+        fi
+    elif [[ -f "$disabled_sh_bak" ]]; then
+        # Disabled (.sh.bak) -> enable
+        if mv "$disabled_sh_bak" "$rainbow_script"; then
+            status="enabled"
+        fi
+    elif [[ -f "$disabled_bak_sh" ]]; then
+        # Disabled (.bak.sh) -> enable (normalize to .sh)
+        if mv "$disabled_bak_sh" "$rainbow_script"; then
+            status="enabled"
+        fi
+    else
+        show_info "RainbowBorders script not found in $UserScripts (checked .sh, .sh.bak, .bak.sh)."
+        return
+    fi
+
+    # Run refresh if available, otherwise apply borders directly
+    if [[ -x "$refresh_script" ]]; then
+        "$refresh_script" >/dev/null 2>&1 &
+    elif [[ "$current" != "disabled" && -x "$rainbow_script" ]]; then
+        "$rainbow_script" >/dev/null 2>&1 &
+    fi
+
+    if [[ -n "$status" ]]; then
+        show_info "Rainbow Borders ${status}."
+    fi
+}
+
+# Submenu to choose Rainbow Borders mode (disable, wallust_random, rainbow, gradient_flow)
+rainbow_borders_menu() {
+    local rainbow_script="$UserScripts/RainbowBorders.sh"
+    local disabled_sh_bak="${rainbow_script}.bak"
+    local disabled_bak_sh="$UserScripts/RainbowBorders.bak.sh"
+    local refresh_script="$scriptsDir/Refresh.sh"
+
+    # Determine current mode/status (internal)
+    local current="disabled"
+    if [[ -f "$rainbow_script" ]]; then
+        current=$(grep -E '^EFFECT_TYPE=' "$rainbow_script" 2>/dev/null | sed -E 's/^EFFECT_TYPE="?([^"]*)"?/\1/')
+        [[ -z "$current" ]] && current="unknown"
+    fi
+
+    # Map internal mode to friendly display
+    local current_display="$current"
+    case "$current" in
+        wallust_random) current_display="Wallust Color" ;;
+        rainbow) current_display="Original Rainbow" ;;
+        gradient_flow) current_display="Gradient Flow" ;;
+        disabled) current_display="Disabled" ;;
+    esac
+
+
+    # Build options and prompt
+    local options="Disable Rainbow Borders\nWallust Color\nOriginal Rainbow\nGradient Flow"
+    local choice
+    choice=$(printf "%b" "$options" | rofi -i -dmenu -config "$rofi_theme" -mesg "Rainbow Borders: current = $current_display")
+
+    [[ -z "$choice" ]] && return
+
+    local previous="$current"
+
+    case "$choice" in
+        "Disable Rainbow Borders")
+            if [[ -f "$rainbow_script" ]]; then
+                mv "$rainbow_script" "$disabled_sh_bak"
+            fi
+            current="disabled"
+            if command -v hyprctl &>/dev/null; then
+                hyprctl reload >/dev/null 2>&1 || true
+            fi
+            ;;
+        "Wallust Color"|"Original Rainbow"|"Gradient Flow")
+            local mode=""
+            case "$choice" in
+                "Wallust Color") mode="wallust_random" ;;
+                "Original Rainbow") mode="rainbow" ;;
+                "Gradient Flow") mode="gradient_flow" ;;
+            esac
+            # Ensure script is enabled
+            if [[ ! -f "$rainbow_script" ]]; then
+                if   [[ -f "$disabled_sh_bak" ]]; then
+                    mv "$disabled_sh_bak" "$rainbow_script"
+                elif [[ -f "$disabled_bak_sh" ]]; then
+                    mv "$disabled_bak_sh" "$rainbow_script"
+                else
+                    show_info "RainbowBorders script not found in $UserScripts."
+                    return
+                fi
+            fi
+
+            # Update EFFECT_TYPE in place; insert if missing
+            if grep -q '^EFFECT_TYPE=' "$rainbow_script" 2>/dev/null; then
+                sed -i 's/^EFFECT_TYPE=.*/EFFECT_TYPE="'"$mode"'"/' "$rainbow_script"
+            else
+                if head -n1 "$rainbow_script" | grep -q '^#!'; then
+                    sed -i '1a EFFECT_TYPE="'"$mode"'"' "$rainbow_script"
+                else
+                    sed -i '1i EFFECT_TYPE="'"$mode"'"' "$rainbow_script"
+                fi
+            fi
+            # Set current to chosen mode
+            current="$mode"
+            ;;
+        *)
+            return ;;
+    esac
+
+    # Run refresh if available
+    if [[ -x "$refresh_script" ]]; then
+        "$refresh_script" >/dev/null 2>&1 &
+    fi
+
+    # Apply mode immediately (in case refresh doesn't trigger it)
+    if [[ "$current" != "disabled" && -x "$rainbow_script" ]]; then
+        "$rainbow_script" >/dev/null 2>&1 &
+    fi
+
+    # No notifications; mode is shown in the menu
+}
 
 # Function to display the menu options
 menu() {
@@ -23,7 +181,8 @@ menu() {
 6. View / Edit  Workspace-Rules
 7. View / Edit  Workspace-Rules-new
 8. View / Edit  Change SDDM Wallpaper
-9. View / Edit  Choose Kitty Terminal Theme
+9. View / Edit  Rainbow Borders Mode
+10. View / Edit  Choose Kitty Terminal Theme
 
 EOF
 }
@@ -42,7 +201,8 @@ main() {
         6) file="$UserConfigs/WindowRules.conf" ;;
         7) file="$UserConfigs/WindowRules-new.conf" ;;
         8) $scriptsDir/sddm_wallpaper.sh ;;
-        9) $scriptsDir/Kitty_themes.sh ;;
+        9) rainbow_borders_menu ;;
+        10) $scriptsDir/Kitty_themes.sh ;;
         *) return ;;  # Do nothing for invalid choices
     esac
 
