@@ -445,7 +445,6 @@ elif systemctl --user list-unit-files 2>/dev/null | grep -q "^${SERVICE}\.servic
 
     systemctl --user daemon-reload >> "$LOG" 2>&1 || true
     systemctl --user enable --now "$SERVICE" >> "$LOG" 2>&1 || true
-    systemctl --user start --now "$SERVICE" >> "$LOG" 2>&1 || true
 
     sleep 1.5
 
