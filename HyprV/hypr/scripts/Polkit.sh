@@ -30,6 +30,9 @@ fi
 
 # List of potential Polkit agent file paths (preferred order)
 polkit=(
+  "/usr/libexec/hyprpolkitagent"
+  "/usr/lib/hyprpolkitagent"
+  "/usr/lib/hyprpolkitagent/hyprpolkitagent"
   "/usr/bin/xfce-polkit"
   "/usr/lib/xfce4/polkit-agent/xfce-polkit"
   "/usr/libexec/xfce-polkit"
@@ -42,9 +45,6 @@ polkit=(
   "/usr/lib/policykit-1-gnome/polkit-gnome-authentication-agent-1"
   "/usr/lib/polkit-kde-authentication-agent-1"
   "/usr/libexec/polkit-kde-authentication-agent-1"
-  "/usr/libexec/hyprpolkitagent"
-  "/usr/lib/hyprpolkitagent"
-  "/usr/lib/hyprpolkitagent/hyprpolkitagent"
 )
 
 executed=false
