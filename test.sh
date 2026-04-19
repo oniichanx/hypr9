@@ -34,7 +34,7 @@ trap 'echo -e "\n${ERROR} Script interrupted! Check $LOG for details."; exit 1' 
 
 # ================== ติดตั้ง dependencies ขั้นต่ำก่อนเลย ==================
 echo -e "${NOTE} Ensuring base dependencies are installed..."
-sudo pacman -S --noconfirm --needed base-devel git pciutils >> "$LOG" 2>&1 || {
+sudo pacman -S --noconfirm --needed base-devel git pciutils rsync >> "$LOG" 2>&1 || {
     echo -e "${ERROR} Failed to install base dependencies. Check $LOG"
     exit 1
 }
