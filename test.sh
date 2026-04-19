@@ -146,7 +146,7 @@ install_stage=(
     papirus-icon-theme ttf-jetbrains-mono ttf-jetbrains-mono-nerd
     ttf-droid ttf-fira-code noto-fonts-emoji adobe-source-code-pro-fonts
     otf-font-awesome lxappearance xfce4-settings nwg-look sddm hyprpolkitagent
-    xdg-utils
+    xdg-utils hyprsunset
 )
 
 clear
