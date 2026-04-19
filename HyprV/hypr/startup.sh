@@ -57,7 +57,7 @@ if [ ! -f "$HOME/.config/hypr/.initial_startup_done" ]; then
     kvantummanager --set "$kvantum_theme" > /dev/null 2>&1 &
 
     # initiate the kb_layout (for some reason) waybar cant launch it
-    "$scriptsDir/KeyboardLayout.sh" > /dev/null 2>&1 &
+    "$scriptsDir/KeyboardLayout.sh switch" > /dev/null 2>&1 &
 
 	# waybar style
 	#if [ -L "$HOME/.config/waybar/config" ]; then
