@@ -34,7 +34,7 @@ trap 'echo -e "\n${ERROR} Script interrupted! Check $LOG for details."; exit 1' 
 
 # ================== ติดตั้ง dependencies ขั้นต่ำก่อนเลย ==================
 echo -e "${NOTE} Ensuring base dependencies are installed..."
-sudo pacman -S --noconfirm --needed base-devel git pciutils rsync >> "$LOG" 2>&1 || {
+sudo pacman -S --noconfirm --needed base-devel git pciutils >> "$LOG" 2>&1 || {
     echo -e "${ERROR} Failed to install base dependencies. Check $LOG"
     exit 1
 }
@@ -129,7 +129,7 @@ echo -e "${NOTE} HyprV4 Installation Script - Updated 2026"
 prep_stage=(
     qt5-wayland qt5ct qt6-wayland qt6ct qt5-svg qt5-quickcontrols2 qt5-graphicaleffects
     gtk3 polkit polkit-gnome pipewire wireplumber jq wl-clipboard cliphist
-    python-requests python-pyquery pacman-contrib
+    python-requests python-pyquery pacman-contrib rsync
 )
 
 nvidia_stage=(
