@@ -7,6 +7,11 @@ edit=${EDITOR:-nano}
 tty=kitty
 config_file="$HOME/.config/hypr/UserConfigs/Default-Apps.conf"
 
+tmp_config_file=$(mktemp)
+sed 's/^\$//g; s/ = /=/g' "$config_file" > "$tmp_config_file"
+source "$tmp_config_file"
+# ##################################### #
+
 # Paths to configuration directories
 configs="$HOME/.config/hypr/configs"
 UserConfigs="$HOME/.config/hypr/UserConfigs"
